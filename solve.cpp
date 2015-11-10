@@ -51,8 +51,8 @@ int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plo
  double *E_prev_tmp = *_E_prev;
  int niter;
  int m = cb.m, n=cb.n;
- int innerBlockRowStartIndex = (m+2)+1;
- int innerBlockRowEndIndex = (((m+2)*(n+2) - 1) - (m)) - (n+2);
+ int innerBlockRowStartIndex = (n+2)+1;
+ int innerBlockRowEndIndex = (((m+2)*(n+2) - 1) - (n)) - (n+2);
 
 
  // We continue to sweep over the mesh until the simulation has reached
@@ -91,17 +91,17 @@ int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plo
     }
 
     // Fills in the RIGHT Ghost Cells
-    for (i = (n+1); i < (m+2)*(n+2); i+=(m+2)) {
+    for (i = (n+1); i < (m+2)*(n+2); i+=(n+2)) {
         E_prev[i] = E_prev[i-2];
     }
 
     // Fills in the LEFT Ghost Cells
-    for (i = 0; i < (m+2)*(n+2); i+=(m+2)) {
+    for (i = 0; i < (m+2)*(n+2); i+=(n+2)) {
         E_prev[i] = E_prev[i+2];
     }	
 
     // Fills in the BOTTOM Ghost Cells
-    for (i = ((m+2)*(n+2)-(m+2)); i < (m+2)*(n+2); i++) {
+    for (i = ((m+2)*(n+2)-(n+2)); i < (m+2)*(n+2); i++) {
         E_prev[i] = E_prev[i - (n+2)*2];
     }
 
@@ -111,7 +111,7 @@ int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plo
 
 #ifdef FUSED
     // Solve for the excitation, a PDE
-    for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(m+2)) {
+    for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(n+2)) {
         E_tmp = E + j;
 	E_prev_tmp = E_prev + j;
         R_tmp = R + j;
@@ -123,7 +123,7 @@ int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plo
     }
 #else
     // Solve for the excitation, a PDE
-    for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(m+2)) {
+    for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(n+2)) {
         E_tmp = E + j;
             E_prev_tmp = E_prev + j;
             for(i = 0; i < n; i++) {
@@ -136,7 +136,7 @@ int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plo
      *     to the next timtestep
      */
 
-    for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(m+2)) {
+    for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(n+2)) {
         E_tmp = E + j;
         R_tmp = R + j;
         for(i = 0; i < n; i++) {
