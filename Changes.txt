@@ -1,0 +1,30 @@
+54,55c54,55
+<  int innerBlockRowStartIndex = (m+2)+1;
+<  int innerBlockRowEndIndex = (((m+2)*(n+2) - 1) - (m)) - (n+2);
+---
+>  int innerBlockRowStartIndex = (n+2)+1;
+>  int innerBlockRowEndIndex = (((m+2)*(n+2) - 1) - (n)) - (n+2);
+94c94
+<     for (i = (n+1); i < (m+2)*(n+2); i+=(m+2)) {
+---
+>     for (i = (n+1); i < (m+2)*(n+2); i+=(n+2)) {
+99c99
+<     for (i = 0; i < (m+2)*(n+2); i+=(m+2)) {
+---
+>     for (i = 0; i < (m+2)*(n+2); i+=(n+2)) {
+104c104
+<     for (i = ((m+2)*(n+2)-(m+2)); i < (m+2)*(n+2); i++) {
+---
+>     for (i = ((m+2)*(n+2)-(n+2)); i < (m+2)*(n+2); i++) {
+114c114
+<     for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(m+2)) {
+---
+>     for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(n+2)) {
+126c126
+<     for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(m+2)) {
+---
+>     for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(n+2)) {
+139c139
+<     for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(m+2)) {
+---
+>     for(j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(n+2)) {
