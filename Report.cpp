@@ -163,8 +163,8 @@ void ReportStart(double dt){
 #else
      myrank = 0;
 #endif
+     printTOD("Simulation begins");
      if (!myrank){
-        printTOD("Simulation begins");
         cout << "dt= " << dt << ", ";
 	cout << "# iters = " << cb.niters << endl;
         cout << "m x n = " << cb.m << " x " << cb.n << endl;
