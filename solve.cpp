@@ -41,10 +41,6 @@ double L2Norm(double sumSq)
 	return l2norm;
 }
 
-
-//MPI_Comm_rank(MPI_COMM_WORLD,&myrank);
-
-
 int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plotter *plotter)
 {
 	// Simulated time is different from the integer timestep number
