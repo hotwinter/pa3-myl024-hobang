@@ -8,6 +8,7 @@
 #include <assert.h>
 // Needed for memalign
 #include <malloc.h>
+#include <mpi.h>
 
 using namespace std;
 
@@ -93,4 +94,19 @@ void printMat(const char mesg[], double *E, int m, int n)
 			printf("\n");
 		}
 	}
+}
+
+enum
+{
+	LEFT = 0,
+	RIGHT,
+	TOP,
+	BOTTOM
+};
+
+int getTag(int edge)
+{
+	int rank = 0;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	return (rank << 2) + edge;
 }
