@@ -20,12 +20,14 @@
 #include <mpi.h>
 using namespace std;
 
-enum { NORTH = 0, EAST, WEST, SOUTH };
+extern int my_rank;
+extern int my_pi, my_pj;
+extern int my_m, my_n;
+
+extern control_block cb;
 
 void repNorms(double l2norm, double mx, double dt, int m,int n, int niter, int stats_freq);
 void stats(double *E, int m, int n, double *_mx, double *sumSq);
-
-extern control_block cb;
 
 #ifdef SSE_VEC
 // If you intend to vectorize using SSE instructions, you must
@@ -44,83 +46,115 @@ double L2Norm(double sumSq)
 	return l2norm;
 }
 
-// Either pads the matrix with boundary condiditions (if the block lies on the problem boundaries)
-// Or waits for the message that holds the needed ghost cells
-void fillGhostCells(double *E, double *E_prev)
+// The following enumerates the MPI tags that we use to
+// distinguish between the boundaries from which a message
+// is SENT. Together with the SOURCE process rank, we can
+// determine exactly what data is held in an MPI messge.
+// e.g. {SOURCE RANK = 0, tag = EAST} indicates that the
+//      message holds the EAST computational boundary, to
+//      be used for filling the WEST ghost cells of process 1.
+enum { NORTH = 0, EAST, WEST, SOUTH };
+
+// Fills in the padded regions of the process:
+// - If one of the four process boundaries is also a GLOBAL boundary
+//   then we enforce that the gradient towards the boundary is zero.
+//   In this case, we don't send or recieve messages.
+// - For INTERIOR process boundaries, we send the boundary computational
+//   cells to the neighboring process, which also produces the data for
+//   the boundary ghost cells. 
+void communicate(double *E_prev)
 {
+	int i, j;
 	MPI_Status status;
 
-	int rank = 0;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	double* in_N= new double[2*(my_m + my_n)]; // allocate some space for the received messages
+	double* in_E = in_N + my_n;
+	double* in_W = in_E + my_m;
+	double* in_S = in_W + my_m;
 
-	int n = cb.n;
-	int m = cb.m;
+	double* out_N = new double[2*(my_m + my_n)]; // allocate some space for the sent messages
+	double* out_E = out_N + my_n;
+	double* out_W = out_E + my_m;
+	double* out_S = out_W + my_m;
 
-	int x = rank % n;
-	int y = rank % m;
-
-	double* msg_N = new double[2*(m + n)];
-	double* msg_E = msg_N + n;
-	double* msg_W = msg_E + m;
-	double* msg_S = msg_W + m;
-	
-
-	// 4 FOR LOOPS set up the padding needed for the boundary conditions
-	int i,j;
-
-	// Fills in the WEST Ghost Cells
-	if (x == 0)
+	// Send the WEST boundary & fill the WEST ghost cells
+	if (my_pj == 0) // ... then the process lies at the WEST boundary of the GLOBAL problem
 	{
-		for (i = 0; i < (m+2)*(n+2); i+=(n+2))
+		for (i = my_n + 2; i < (my_m + 1)*(my_n + 2); i += my_n + 2)
 		{
-			E_prev[i] = E_prev[i+2];
+			E_prev[i] = E_prev[i + 2];
+		}
+	}
+	else // ... the process's WEST boundary lies in the interior of the GLOBAL problem 
+	{
+		MPI_Send(out_W, my_m, MPI_DOUBLE, my_rank, WEST, MPI_COMM_WORLD);
+		MPI_Recv(in_W, my_m, MPI_DOUBLE, my_rank - 1, EAST, MPI_COMM_WORLD, &status);
+
+		for (i = my_n + 2, j = 0; j < my_m; i += my_n + 2, ++j) 		
+		{
+			E_prev[i] = in_W[j];
+		}
+	}
+
+	// Send the EAST boundary & fill the EAST ghost cells
+	if (my_pj == cb.px - 1)
+	{
+		for (i = (my_n + 1) + (my_n + 2); i < (my_n + 1) + (my_m + 1)*(my_n + 2); i += my_n + 2)
+		{
+			E_prev[i] = E_prev[i - 2];
 		}
 	}
 	else
 	{
-		MPI_Recv(msg_W, m, MPI_DOUBLE, rank - 1, (rank - 1) << 2 + EAST, MPI_COMM_WORLD, &status);
+		MPI_Send(out_E, my_m, MPI_DOUBLE, my_rank, EAST, MPI_COMM_WORLD);
+		MPI_Recv(in_E, my_m, MPI_DOUBLE, my_rank + 1, WEST, MPI_COMM_WORLD, &status);
+
+		for (i = (my_n + 1) + (my_n + 2), j = 0; j < my_m; i += my_n + 2, ++j)
+		{
+			E_prev[i] = in_E[j];
+		}
 	}
 
-	// Fills in the EAST Ghost Cells
-	if (x == n-1)
+	// Send the NORTH boundary & fill the NORTH ghost cells
+	if (my_pi == 0)
 	{
-		for (i = (n+1); i < (m+2)*(n+2); i+=(n+2))
+		for (i = 1; i < my_n + 1; ++i)
 		{
-			E_prev[i] = E_prev[i-2];
+			E_prev[i] = E_prev[i + 2*(my_n + 2)];
 		}
 	}
 	else
 	{
-		MPI_Recv(msg_E, m, MPI_DOUBLE, rank + 1, (rank + 1) << 2 + WEST, MPI_COMM_WORLD, &status);
+		MPI_Send(out_N, my_n, MPI_DOUBLE, my_rank, NORTH, MPI_COMM_WORLD);
+		MPI_Recv(in_N, my_n, MPI_DOUBLE, my_rank + cb.px, SOUTH, MPI_COMM_WORLD, &status);
+
+		for (j = 0; j < my_n; ++j)
+		{
+			E_prev[j + 1] = in_N[j];
+		}
 	}
 
-	// Fills in the NORTH Ghost Cells
-	if (y == 0)
+	// Send the SOUTH boundary & fill the SOUTH ghost cells
+	if (my_pi == cb.py - 1)
 	{
-		for (i = 0; i < (n+2); i++)
+		for (i = (my_m + 2)*(my_n + 2)-(my_n + 1); i < (my_m+2)*(my_n+2) - 1; ++i)
 		{
-			E_prev[i] = E_prev[i + (n+2)*2];
+			E_prev[i] = E_prev[i - 2*(my_n + 2)];
 		}
 	}
 	else
 	{
-		//MPI_Recv(msg_N, n, MPI_DOUBLE, rank + )
-	}
+		MPI_Send(out_S, my_n, MPI_DOUBLE, my_rank, SOUTH, MPI_COMM_WORLD);
+		MPI_Recv(in_S, my_n, MPI_DOUBLE, my_rank - cb.px, NORTH, MPI_COMM_WORLD, &status);
 
-	// Fills in the SOUTH Ghost Cells
-	if (y == n-1)
-	{
-		for (i = ((m+2)*(n+2)-(n+2)); i < (m+2)*(n+2); i++)
+		for (j = 0; j < my_n; ++j)
 		{
-			E_prev[i] = E_prev[i - (n+2)*2];
+			E_prev[j + (my_m + 2)*(my_n + 2)-(my_n + 1)] = in_S[j];
 		}
 	}
-	else
-	{
 
-	}
-
-	delete[] msg_N;
+	delete[] in_N;
+	delete[] out_N;
 }
 
 
@@ -157,45 +191,9 @@ int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plo
 			}
 		}
 
-		/* 
-		 * Copy data from boundary of the computational box to the
-		 * padding region, set up for differencing computational box's boundary
-		 *
-		 * These are physical boundary conditions, and are not to be confused
-		 * with ghost cells that we would use in an MPI implementation
-		 *
-		 * The reason why we copy boundary conditions is to avoid
-		 * computing single sided differences at the boundaries
-		 * which increase the running time of solve()
-		 *
-		 */
- 
-		// 4 FOR LOOPS set up the padding needed for the boundary conditions
-		int i,j;
+		int i, j;
 
-		// Fills in the TOP Ghost Cells
-		for (i = 0; i < (n+2); i++)
-		{
-			E_prev[i] = E_prev[i + (n+2)*2];
-		}
-
-		// Fills in the RIGHT Ghost Cells
-		for (i = (n+1); i < (m+2)*(n+2); i+=(n+2))
-		{
-			E_prev[i] = E_prev[i-2];
-		}
-
-		// Fills in the LEFT Ghost Cells
-		for (i = 0; i < (m+2)*(n+2); i+=(n+2))
-		{
-			E_prev[i] = E_prev[i+2];
-		}
-
-		// Fills in the BOTTOM Ghost Cells
-		for (i = ((m+2)*(n+2)-(n+2)); i < (m+2)*(n+2); i++)
-		{
-			E_prev[i] = E_prev[i - (n+2)*2];
-		}
+		communicate(E_prev);
 
 		//////////////////////////////////////////////////////////////////////////////
 
