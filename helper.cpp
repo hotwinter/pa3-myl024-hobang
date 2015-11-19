@@ -14,9 +14,9 @@ using namespace std;
 
 extern control_block cb;
 
-int my_rank = 0;
-int my_n = 0; // the number of columns in the subproblem
-int my_m = 0; // ............. rows    .................
+int my_rank;
+int my_pi, my_pj; // position of the process in the x-by-y grid of processes (we distribute the processes in row major order)
+int my_m, my_n; // the number of rows,cols in the subproblem (respectively)
 
 void printMat(const char mesg[], double *E, int m, int n);
 
@@ -45,15 +45,11 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 	int rx = n % cb.px;
 	int ry = m % cb.py;
 
-	// Position of the process in the grid of processes
-	int iP = my_rank / px;
-	int jP = my_rank % px;
-
 	///////////////////////////////////////////////////////////////////////////////////////
 	//// Initialize R (R's ghosts cells are arbitrary since we don't use them anyways) ////
 	///////////////////////////////////////////////////////////////////////////////////////
 
-	int iMin = iP*mMin + min(iP, ry); // GLOBAL index of the first row of the "computational" block (ignoring ghost cells)
+	int iMin = my_pi*mMin + min(my_pi, ry); // GLOBAL index of the first row of the "computational" block (ignoring ghost cells)
 	int di = (m + 1)/2 - iMin; // Distance from iMin to the last row of 0.0s
 
 	for (int i = my_n + 2; i < (di + 1)*(my_n + 2); ++i)
@@ -70,7 +66,7 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 	//// Msg passing will fill in interior ghost cells with appropriate values ////
 	///////////////////////////////////////////////////////////////////////////////
 
-	int jMin = jP*nMin + min(jP, rx);
+	int jMin = my_pj*nMin + min(my_pj, rx);
 	int dj = (n + 1)/2 - jMin;
 
 	for (int i = 0; i < (my_m + 2)*(my_n + 2); ++i)
@@ -103,8 +99,11 @@ double *alloc1D(int mPlus2,int nPlus2)
 	int m = mPlus2 - 2; // get the unpadded size of the global problem
 	int n = nPlus2 - 2;
 
-	my_m = m / cb.py + ((my_rank / cb.px) < (m % cb.py));
-	my_n = n / cb.px + ((my_rank % cb.px) < (n % cb.px));
+	my_pi = my_rank / cb.px;
+	my_pj = my_rank % cb.px;
+
+	my_m = m / cb.py + (my_pi < (m % cb.py));
+	my_n = n / cb.px + (my_pj < (n % cb.px));
 
 	double *E;
 	// Ensure that allocated memory is aligned on a 16 byte boundary
@@ -141,18 +140,4 @@ void printMat(const char mesg[], double *E, int m, int n)
 			printf("\n");
 		}
 	}
-}
-
-inline int getTag(int edge)
-{
-	int rank = 0;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	return (rank << 2) + edge;
-}
-
-inline int getRank()
-{
-	int rank = 0;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	return rank;
 }
