@@ -76,7 +76,8 @@ void recv(double *E_prev)
 void communicate(double *E_prev)
 {
 	int i, j;
-	MPI_Request requests[8];
+	MPI_Request sendReqs[4];
+	MPI_Request recvReqs[4];
 	MPI_Status statuses[4];
 
 	double* in_W = new double[2*my_m]; // allocate some space for the received messages
@@ -84,6 +85,8 @@ void communicate(double *E_prev)
 
 	double* out_W = new double[2*my_m]; // allocate some space for the sent messages
 	double* out_E = out_W + my_m;
+
+	int msgCounter = 0;
 
 	// Send the NORTH boundary & fill the NORTH ghost cells
 	if (my_pi == 0)
@@ -96,8 +99,9 @@ void communicate(double *E_prev)
 	}
 	else
 	{
-		MPI_Irecv(&E_prev[1], my_n, MPI_DOUBLE, my_rank - cb.px, SOUTH, MPI_COMM_WORLD, requests + 0);
-		MPI_Isend(&E_prev[my_n + 3], my_n, MPI_DOUBLE, my_rank, NORTH, MPI_COMM_WORLD, requests + 4);
+		MPI_Irecv(&E_prev[1], my_n, MPI_DOUBLE, my_rank - cb.px, SOUTH, MPI_COMM_WORLD, recvReqs + msgCounter);
+		MPI_Isend(&E_prev[my_n + 3], my_n, MPI_DOUBLE, my_rank, NORTH, MPI_COMM_WORLD, sendReqs + 0);
+		msgCounter++;
 	}
 
 	// Send the SOUTH boundary & fill the SOUTH ghost cells
@@ -111,8 +115,9 @@ void communicate(double *E_prev)
 	else
 	{
 		printf("S\n");
-		MPI_Irecv(&E_prev[(my_m + 1)*(my_n + 2) + 1], my_n, MPI_DOUBLE, my_rank - cb.px, NORTH, MPI_COMM_WORLD, requests + 1);
-		MPI_Isend(&E_prev[my_m*(my_n + 2) + 1], my_n, MPI_DOUBLE, my_rank, SOUTH, MPI_COMM_WORLD, requests + 5);
+		MPI_Irecv(&E_prev[(my_m + 1)*(my_n + 2) + 1], my_n, MPI_DOUBLE, my_rank - cb.px, NORTH, MPI_COMM_WORLD, recvReqs + msgCounter);
+		MPI_Isend(&E_prev[my_m*(my_n + 2) + 1], my_n, MPI_DOUBLE, my_rank, SOUTH, MPI_COMM_WORLD, sendReqs + 1);
+		msgCounter++;
 		printf("SS\n");
 	}
 
@@ -131,8 +136,9 @@ void communicate(double *E_prev)
 			printf("W  %d  %d\n", i, j);
 			out_W[j] = E_prev[i];
 		}
-		MPI_Irecv(in_W, my_m, MPI_DOUBLE, my_rank - 1, EAST, MPI_COMM_WORLD, requests + 2);
-		MPI_Isend(&E_prev[my_n + 3], my_m, MPI_DOUBLE, my_rank, WEST, MPI_COMM_WORLD, requests + 6);
+		MPI_Irecv(in_W, my_m, MPI_DOUBLE, my_rank - 1, EAST, MPI_COMM_WORLD, recvReqs + msgCounter);
+		MPI_Isend(&E_prev[my_n + 3], my_m, MPI_DOUBLE, my_rank, WEST, MPI_COMM_WORLD, sendReqs + 2);
+		msgCounter++;
 	}
 
 	// Send the EAST boundary & fill the EAST ghost cells
@@ -140,7 +146,7 @@ void communicate(double *E_prev)
 	{
 		for (i = (my_n + 1) + 1*(my_n + 2); i < (my_n + 1) + (my_m + 1)*(my_n + 2); i += my_n + 2)
 		{
-			//printf("%d  %d  %d\n", my_m, my_n, i);
+			printf("%d  %d  %d\n", my_m, my_n, i);
 			E_prev[i] = E_prev[i - 2];
 		}
 	}
@@ -150,16 +156,22 @@ void communicate(double *E_prev)
 		{
 			out_E[j] = E_prev[i];
 		}
-		MPI_Irecv(in_E, my_m, MPI_DOUBLE, my_rank + 1, WEST, MPI_COMM_WORLD, requests + 3);
-		MPI_Isend(out_E, my_m, MPI_DOUBLE, my_rank, EAST, MPI_COMM_WORLD, requests + 7);
+		MPI_Irecv(in_E, my_m, MPI_DOUBLE, my_rank + 1, WEST, MPI_COMM_WORLD, recvReqs + msgCounter);
+		MPI_Isend(out_E, my_m, MPI_DOUBLE, my_rank, EAST, MPI_COMM_WORLD, sendReqs + 3);
+		msgCounter++;
 	}
 
-	MPI_Waitall(4, requests, statuses);
+	printf("lala\n");
+
+	MPI_Waitall(msgCounter, recvReqs, statuses);
+
+	printf("asdfasdf\n");
 
 	if (my_pj != 0)
 	{
 		for (i = my_n + 2, j = 0; j < my_m; i += my_n + 2, ++j) 		
 		{
+			printf("blahblah\n");
 			E_prev[i] = in_W[j];
 		}
 	}
@@ -168,16 +180,19 @@ void communicate(double *E_prev)
 	{
 		for (i = (my_n + 1) + (my_n + 2), j = 0; j < my_m; i += my_n + 2, ++j)
 		{
+			printf("haha\n");
 			E_prev[i] = in_E[j];
 		}
 	}
 
 	delete[] in_W;
 	delete[] out_W;
+
+	printf("communication finished\n");
 }
 
 
-void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plotter *plotter, double &L2, double &Linf){
+void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plotter *plotter, double &L2, double &Linf)
 {
 	// Simulated time is different from the integer timestep number
 	double t = 0.0;
