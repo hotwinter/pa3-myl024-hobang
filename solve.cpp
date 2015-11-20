@@ -24,6 +24,8 @@ extern int my_rank;
 extern int my_pi, my_pj;
 extern int my_m, my_n;
 
+extern double *in_W, *in_E, *out_W, *out_E;
+
 extern control_block cb;
 
 void repNorms(double l2norm, double mx, double dt, int m,int n, int niter, int stats_freq);
@@ -78,12 +80,7 @@ void communicate(double *E_prev)
 	int i, j;
 	MPI_Request sendReqs[4];
 	MPI_Request recvReqs[4];
-
-	double* in_W = new double[2*my_m]; // allocate some space for the received messages
-	double* in_E = in_W + my_m;
-
-	double* out_W = new double[2*my_m]; // allocate some space for the sent messages
-	double* out_E = out_W + my_m;
+	MPI_Status  statuses[4];
 
 	int msgCounter = 0;
 
@@ -92,7 +89,6 @@ void communicate(double *E_prev)
 	{
 		for (i = 1; i < my_n + 1; ++i)
 		{
-			//printf("N  %d  %d\n", i, i+2*(my_n + 2));
 			E_prev[i] = E_prev[i + 2*(my_n + 2)];
 		}
 	}
@@ -113,11 +109,9 @@ void communicate(double *E_prev)
 	}
 	else
 	{
-		//printf("S\n");
 		MPI_Irecv(&E_prev[(my_m + 1)*(my_n + 2) + 1], my_n, MPI_DOUBLE, my_rank + cb.px, NORTH, MPI_COMM_WORLD, recvReqs + msgCounter);
 		MPI_Isend(&E_prev[my_m*(my_n + 2) + 1], my_n, MPI_DOUBLE, my_rank + cb.px, SOUTH, MPI_COMM_WORLD, sendReqs + 1);
 		msgCounter++;
-		//printf("SS\n");
 	}
 
 	// Send the WEST boundary & fill the WEST ghost cells
@@ -132,7 +126,6 @@ void communicate(double *E_prev)
 	{
 		for (i = my_n + 3, j = 0; j < my_m; i += my_n + 2, ++j)
 		{
-			//printf("W  %d  %d\n", i, j);
 			out_W[j] = E_prev[i];
 		}
 		MPI_Irecv(in_W, my_m, MPI_DOUBLE, my_rank - 1, EAST, MPI_COMM_WORLD, recvReqs + msgCounter);
@@ -145,7 +138,6 @@ void communicate(double *E_prev)
 	{
 		for (i = (my_n + 1) + 1*(my_n + 2); i < (my_n + 1) + (my_m + 1)*(my_n + 2); i += my_n + 2)
 		{
-			//printf("E  %d  %d  %d\n", my_m, my_n, i);
 			E_prev[i] = E_prev[i - 2];
 		}
 	}
@@ -160,18 +152,13 @@ void communicate(double *E_prev)
 		msgCounter++;
 	}
 
-	//printf("lala\n");
-
-	MPI_Status statuses[4];
+	// Wait for all messages to be received before unpacking data for WEST and EAST messages
 	MPI_Waitall(msgCounter, recvReqs, statuses);
-
-	//printf("asdfasdf\n");
 
 	if (my_pj != 0)
 	{
 		for (i = my_n + 2, j = 0; j < my_m; i += my_n + 2, ++j) 		
 		{
-			//printf("blahblah\n");
 			E_prev[i] = in_W[j];
 		}
 	}
@@ -180,13 +167,9 @@ void communicate(double *E_prev)
 	{
 		for (i = (my_n + 1) + (my_n + 2), j = 0; j < my_m; i += my_n + 2, ++j)
 		{
-			//printf("haha\n");
 			E_prev[i] = in_E[j];
 		}
 	}
-
-	delete[] in_W;
-	delete[] out_W;
 
 	printf("communication finished\n");
 }
@@ -214,9 +197,9 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 	{
 		if (cb.debug && (niter==0))
 		{
-			stats(E_prev,m,n,&mx,&sumSq);
+			stats(E_prev, my_m, my_n, &mx, &sumSq);
 			double l2norm = L2Norm(sumSq);
-			repNorms(l2norm,mx,dt,m,n,-1, cb.stats_freq);
+			repNorms(l2norm, mx, dt, my_m, my_n, -1, cb.stats_freq);
 
 			if (cb.plot_freq)
 			{
@@ -249,12 +232,12 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		}
 	#else
 		// Solve for the excitation, a PDE
-		for (j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=my_n+2)
+		for (j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_n + 2)
 		{
 			E_tmp = E + j;
 			E_prev_tmp = E_prev + j;
 
-			for (i = 0; i < my_n; i++)
+			for (i = 0; i < my_n; ++i)
 			{
 				E_tmp[i] = E_prev_tmp[i]+alpha*(E_prev_tmp[i+1]+E_prev_tmp[i-1]-4*E_prev_tmp[i]+E_prev_tmp[i+(my_n+2)]+E_prev_tmp[i-(my_n+2)]);
 			}
@@ -265,11 +248,11 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		 *     to the next timtestep
 		 */
 
-		for (j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+=(my_n+2))
+		for (j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_n + 2)
 		{
 			E_tmp = E + j;
 			R_tmp = R + j;
-			for (i = 0; i < my_n; i++)
+			for (i = 0; i < my_n; ++i)
 			{
 				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
 				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
@@ -282,9 +265,9 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		{
 			if ( !(niter % cb.stats_freq))
 			{
-				stats(E, m, n, &mx, &sumSq);
+				stats(E, my_m, my_n, &mx, &sumSq);
 				double l2norm = L2Norm(sumSq);
-				repNorms(l2norm,mx,dt,m,n,niter, cb.stats_freq);
+				repNorms(l2norm, mx, dt, my_m, my_n, niter, cb.stats_freq);
 			}
 		}
 
@@ -302,7 +285,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 	} //end of 'niter' loop at the beginning
 
 	// return the L2 and infinity norms via in-out parameters
-	stats(E_prev,m,n,&Linf,&sumSq);
+	stats(E_prev, my_m, my_n, &Linf, &sumSq);
 	L2 = L2Norm(sumSq);
 
 	// Swap pointers so we can re-use the arrays

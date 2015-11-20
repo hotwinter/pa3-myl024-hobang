@@ -18,6 +18,14 @@ int my_rank;
 int my_pi, my_pj; // position of the process in the x-by-y grid of processes (we distribute the processes in row major order)
 int my_m, my_n; // the number of rows,cols in the subproblem (respectively)
 
+// We allocate some space for WESTward and EASTward messages
+// Because the ghosts cells are noncontiguous, we need to pack
+// and unpack the data when sending and receiving. I believe
+// that we can also use MPI_DOUBLE_vector to specify a "strided"
+// data type for the messages, but http://stackoverflow.com/a/29134807
+// suggests that it's just better to do the (un)packing ourselves.
+double *in_W, *in_E, *out_W, *out_E;
+
 void printMat(const char mesg[], double *E, int m, int n);
 
 inline int min(int a, int b) { if (a < b) return a; else return b; }
@@ -106,11 +114,18 @@ double *alloc1D(int mPlus2,int nPlus2)
 	my_m = m / cb.py + (my_pi < (m % cb.py));
 	my_n = n / cb.px + (my_pj < (n % cb.px));
 
-	double *E;
+	// Allocate contiguous memory for the WESTward and EASTward messages
+	in_W  = new double[4*my_m];
+	in_E  = in_W  + my_m;
+	out_W = in_E  + my_m;
+	out_E = out_W + my_m;
+
 	// Ensure that allocated memory is aligned on a 16 byte boundary
 	// Pad the subproblem to accomodate E_prev's ghost cells
 	// We also pad R, although this is redundant and just for consistency
+	double *E;
 	assert(E= (double*) memalign(16, sizeof(double)*(my_m + 2)*(my_n + 2)));
+
 	return(E);
 }
 
