@@ -94,10 +94,10 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 	}
 
 	// We only print the meshes if they are small enough
-	//printf("\n\nRANK %d INITIAL CONDITIONS:\n\n", my_rank);
-	printMat("E_prev", E_prev, my_m, my_n);
-	printMat("R", R, my_m, my_n);
-	printf("\n\nRANK %d INITIAL CONDITIONS:\n\n", my_rank);
+	
+//	printf("\n\nRANK %d INITIAL CONDITIONS:\n\n", my_rank);
+//	printMat("E_prev", E_prev, my_m, my_n);
+//	printMat("R", R, my_m, my_n);
 }
 
 // NOTE: This gets called with arguments (cb.m+2, cb.n+2) in apf.cpp
@@ -142,7 +142,14 @@ void printMat(const char mesg[], double *E, int m, int n)
 		int rowIndex = i / (n + 2);
 		int colIndex = i % (n + 2);
 
-		printf("%6.3f ", E[i]); // For testing purposes, we also print the ghost cells
+		if ((colIndex == 0 || colIndex == n + 1) && (rowIndex == 0 || rowIndex == m+1))
+		{
+			printf("      ");
+		}
+		else
+		{
+			printf("%1.3f ", E[i]); // For testing purposes, we also print the ghost cells
+		}
 
 //		if ((colIndex>0) && (colIndex<n+1))
 //		{

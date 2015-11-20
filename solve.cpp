@@ -30,6 +30,7 @@ extern control_block cb;
 
 void repNorms(double l2norm, double mx, double dt, int m,int n, int niter, int stats_freq);
 void stats(double *E, int m, int n, double *_mx, double *sumSq);
+void printMat(const char*, double*, int m, int n);
 
 #ifdef SSE_VEC
 // If you intend to vectorize using SSE instructions, you must
@@ -64,16 +65,6 @@ enum { NORTH = 0, EAST, WEST, SOUTH };
 // - For INTERIOR process boundaries, we send the boundary computational
 //   cells to the neighboring process, which also produces the data for
 //   the boundary ghost cells. 
-
-void send(double *E_prev)
-{
-
-}
-
-void recv(double *E_prev)
-{
-
-}
 
 void communicate(double *E_prev)
 {
@@ -129,7 +120,7 @@ void communicate(double *E_prev)
 			out_W[j] = E_prev[i];
 		}
 		MPI_Irecv(in_W, my_m, MPI_DOUBLE, my_rank - 1, EAST, MPI_COMM_WORLD, recvReqs + msgCounter);
-		MPI_Isend(&E_prev[my_n + 3], my_m, MPI_DOUBLE, my_rank - 1, WEST, MPI_COMM_WORLD, sendReqs + 2);
+		MPI_Isend(out_W, my_m, MPI_DOUBLE, my_rank - 1, WEST, MPI_COMM_WORLD, sendReqs + 2);
 		msgCounter++;
 	}
 
@@ -171,7 +162,8 @@ void communicate(double *E_prev)
 		}
 	}
 
-	printf("communication finished\n");
+	printf("RANK %d's E_prev with ghost cells filled:\n", my_rank);
+	printMat("", E_prev, my_m, my_n);
 }
 
 
