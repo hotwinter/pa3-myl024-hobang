@@ -22,14 +22,11 @@ control_block cb;
 // External functions
 double *alloc1D(int m,int n);
 void cmdLine(int argc, char *argv[]);
-void printTOD(string mesg);
 void init (double *E,double *E_prev,double *R,int m,int n);
-void stats(double *E, int m, int n, double *_mx, double *sumSq);
-double L2Norm(double sumSq);
 void ReportStart(double dt);
 void ReportEnd(double l2norm, double mx, double t0);
 double getTime();
-int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plotter *plotter);
+void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plotter *plotter, double &L2, double &Linf);
 
 // Main program
 int main(int argc, char** argv)
@@ -118,7 +115,8 @@ int main(int argc, char** argv)
 #else
  double t0 = -getTime();
 #endif
- int niter = solve(&E, &E_prev, R, alpha, dt, plotter);
+ double L2, Linf;
+ solve(&E, &E_prev, R, alpha, dt, plotter,L2,Linf);
 
 #ifdef _MPI_
  t0 += MPI_Wtime();
@@ -126,14 +124,8 @@ int main(int argc, char** argv)
  t0 += getTime();
 #endif
 
-if (niter != cb.niters)
-   cout << "*** niter should be equal to niters" << endl;
  // Report various information
- double mx;
- double sumSq;
- stats(E_prev,cb.m,cb.n,&mx, &sumSq);
- double l2norm = L2Norm(sumSq);
- ReportEnd(l2norm,mx,t0);
+ ReportEnd(L2,Linf,t0);
 
  if (cb.plot_freq){
     cout << "\n\nEnter any input to close the program and the plot...";

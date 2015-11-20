@@ -51,15 +51,13 @@ void repNorms(double l2norm, double mx,  double dt, int m,int n, int niter, int 
      myrank = 0;
 #endif
      if (!myrank){
-        if ( !(niter % stats_freq)) {
-            cout <<      setw(6);
-            cout.setf(ios::fixed);
-            cout << "iteration= " << niter << ", t= ";
-            cout.unsetf(ios::fixed);
-            cout.setf(ios::scientific);
-            cout.precision(6);
-            cout << "Max norm: " << mx << ", L2norm: " << l2norm << endl;
-        }
+        cout <<      setw(6);
+        cout.setf(ios::fixed);
+        cout << "iteration = " << niter << ", ";
+        cout.unsetf(ios::fixed);
+        cout.setf(ios::scientific);
+        cout.precision(6);
+        cout << "Max norm: " << mx << ", L2norm: " << l2norm << endl;
     }
 #ifdef _MPI_
     MPI_Barrier(MPI_COMM_WORLD);
@@ -117,10 +115,10 @@ void ReportEnd(double l2norm, double mx, double t0){
 	cout << "End at";
         cout <<          setw(6);
         cout.setf(ios::fixed);
-        cout << " iteration " << cb.niters << endl;
+        cout << " iteration " << cb.niters-1 << endl;
         cout.unsetf(ios::fixed);
         cout.setf(ios::scientific);
-        cout.precision(6);
+        cout.precision(5);
         cout << "Max norm: " << mx << ", L2norm: " << l2norm << endl;
         cout.unsetf(ios::scientific);
         cout.unsetf(ios::fixed);
