@@ -177,7 +177,7 @@ void communicate(double *E_prev)
 }
 
 
-int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plotter *plotter)
+void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plotter *plotter, double &L2, double &Linf){
 {
 	// Simulated time is different from the integer timestep number
 	double t = 0.0;
@@ -186,6 +186,7 @@ int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plo
 	double *R_tmp = R;
 	double *E_tmp = *_E;
 	double *E_prev_tmp = *_E_prev;
+	double mx, sumSq;
 	int niter;
 	int m = cb.m, n=cb.n;
 	int innerBlockRowStartIndex = (my_n+2)+1;
@@ -198,21 +199,19 @@ int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plo
 	{
 		if (cb.debug && (niter==0))
 		{
-			double mx;
-			double sumSq;
 			stats(E_prev,m,n,&mx,&sumSq);
 			double l2norm = L2Norm(sumSq);
-			repNorms(l2norm,mx,dt,m,n,niter, cb.stats_freq);
+			repNorms(l2norm,mx,dt,m,n,-1, cb.stats_freq);
 
 			if (cb.plot_freq)
 			{
-				//plotter->updatePlot(E,  niter, m+1, n+1);
+				plotter->updatePlot(E,  -1, m+1, n+1);
 			}
 		}
 
 		int i, j;
 
-//		communicate(E_prev);
+		communicate(E_prev);
 
 		//////////////////////////////////////////////////////////////////////////////
 
@@ -264,20 +263,21 @@ int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plo
 	#endif
 		/////////////////////////////////////////////////////////////////////////////////
 
-		if ((cb.stats_freq) && (niter !=0))
+		if (cb.stats_freq)
 		{
-			double mx;
-			double sumSq;
-			//stats(E_prev,m,n,&mx,&sumSq);
-			double l2norm = L2Norm(sumSq);
-			//repNorms(l2norm,mx,dt,m,n,niter, cb.stats_freq);
+			if ( !(niter % cb.stats_freq))
+			{
+				stats(E, m, n, &mx, &sumSq);
+				double l2norm = L2Norm(sumSq);
+				repNorms(l2norm,mx,dt,m,n,niter, cb.stats_freq);
+			}
 		}
 
 		if (cb.plot_freq)
 		{
 			if (!(niter % cb.plot_freq))
 			{
-				//plotter->updatePlot(E,  niter, m, n);
+				plotter->updatePlot(E,  niter, m, n);
 			}
 		}
 
@@ -286,9 +286,12 @@ int solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plo
 
 	} //end of 'niter' loop at the beginning
 
+	// return the L2 and infinity norms via in-out parameters
+	stats(E_prev,m,n,&Linf,&sumSq);
+	L2 = L2Norm(sumSq);
+
 	// Swap pointers so we can re-use the arrays
 	*_E = E;
 	*_E_prev = E_prev;
 	
-	return niter;
 }
