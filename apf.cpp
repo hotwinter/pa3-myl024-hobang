@@ -133,6 +133,8 @@ int main(int argc, char** argv)
     cin >> resp;
   }
 
+printf("\n");
+printf("myrank: %d\n", myrank);
  free (E);
  free (E_prev);
  free (R);

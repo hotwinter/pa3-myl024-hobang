@@ -32,6 +32,12 @@ void repNorms(double l2norm, double mx, double dt, int m,int n, int niter, int s
 void stats(double *E, int m, int n, double *_mx, double *sumSq);
 void printMat(const char*, double*, int m, int n);
 
+const int CORNER_SIZE = 1;
+const int PAD_SIZE = 2;
+const int ROOT = 0;
+
+enum { NORTH = 0, EAST, WEST, SOUTH };
+
 #ifdef SSE_VEC
 // If you intend to vectorize using SSE instructions, you must
 // disable the compiler's auto-vectorizer
@@ -46,28 +52,9 @@ double L2Norm(double sumSq)
 {
 	double l2norm = sumSq /  (double) ((cb.m)*(cb.n));
 	l2norm = sqrt(l2norm);
+	
 	return l2norm;
 }
-
-// The following enumerates the MPI tags that we use to
-// distinguish between the boundaries from which a message
-// is SENT. Together with the SOURCE process rank, we can
-// determine exactly what data is held in an MPI messge.
-// e.g. {SOURCE RANK = 0, tag = EAST} indicates that the
-//      message holds the EAST computational boundary, to
-//      be used for filling the WEST ghost cells of process 1.
-enum { NORTH = 0, EAST, WEST, SOUTH };
-
-// Fills in the padded regions of the process:
-// - If one of the four process boundaries is also a GLOBAL boundary
-//   then we enforce that the gradient towards the boundary is zero.
-//   In this case, we don't send or recieve messages.
-// - For INTERIOR process boundaries, we send the boundary computational
-//   cells to the neighboring process, which also produces the data for
-//   the boundary ghost cells. 
-
-const int CORNER_SIZE = 1;
-const int PAD_SIZE = 2;
 
 void communicate(double *E_prev)
 {
@@ -177,11 +164,24 @@ void communicate(double *E_prev)
 }
 
 
-double accumulateResults(double *E, double dt, double *mx, double *sumSq)
-{
-	double l2norm = 0;
-	stats(E, my_m, my_n, mx, sumSq);
+void accumulateResults(double* E, double dt, double* mx, double* L2)
+{	
+	double maxNorm = 0;
+	double reducedSq = 0.0;	
+	double sumSq = 0.0;
+	stats(E, my_m, my_n, mx, &sumSq);	
 
+	MPI_Reduce(&sumSq, &reducedSq, 1, MPI_DOUBLE, MPI_SUM, ROOT, MPI_COMM_WORLD);
+	MPI_Reduce(mx, &maxNorm, 1, MPI_DOUBLE, MPI_MAX, ROOT, MPI_COMM_WORLD);
+
+	if(my_rank == 0) {
+		*L2 = L2Norm(reducedSq);
+		*mx = maxNorm;
+//		printf("reduced sum, l2  : %f, %f \n", reducedSq, *L2);
+		
+		///repNorms(l2norm, *mx, dt, cb.m, cb.n, -1, cb.stats_freq);
+	}
+/*
 	if (my_rank == 0)
 	{
 		double src_sumSq;
@@ -199,8 +199,9 @@ double accumulateResults(double *E, double dt, double *mx, double *sumSq)
 	{
 		MPI_Send(sumSq, 1, MPI_DOUBLE, 0, 256, MPI_COMM_WORLD);
 	}
+*/
+	
 
-	return l2norm;
 }
 
 
@@ -306,7 +307,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		}
 	#endif
 		/////////////////////////////////////////////////////////////////////////////////
-
+/*
 		if (cb.stats_freq)
 		{
 			if (!(niter % cb.stats_freq))
@@ -326,7 +327,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 				//plotter->updatePlot(E,  niter, m, n);
 			}
 		}
-
+*/
 		// Swap current and previous meshes
 		double *tmp = E; 
 		E = E_prev; 
@@ -334,10 +335,10 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 
 	} //end of 'niter' loop at the beginning
 
-	// return the L2 and infinity norms via in-out parameters
 	//stats(E_prev, my_m, my_n, &Linf, &sumSq);
 	//L2 = L2Norm(sumSq);
-	//L2 = accumulateResults(E_prev, dt, &Linf, &sumSq);
+	
+	accumulateResults(E_prev, dt, &Linf, &L2);
 
 	// Swap pointers so we can re-use the arrays
 	*_E = E;
