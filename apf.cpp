@@ -118,6 +118,7 @@ int main(int argc, char** argv)
  double L2, Linf;
  solve(&E, &E_prev, R, alpha, dt, plotter,L2,Linf);
 
+
 #ifdef _MPI_
  t0 += MPI_Wtime();
 #else
