@@ -57,8 +57,8 @@ int main(int argc, char** argv)
  cmdLine( argc, argv);
 // The algorithm fails when n is too small
  if (cb.n <= 25){
-    cout << "\n *** N must be larger than 25.  Exiting ... " << endl << endl;
-    exit(-1);
+   // cout << "\n *** N must be larger than 25.  Exiting ... " << endl << endl;
+   // exit(-1);
  }
  cb.m = cb.n;
  int nprocs=1, myrank=0;
@@ -117,7 +117,6 @@ int main(int argc, char** argv)
 #endif
  double L2, Linf;
  solve(&E, &E_prev, R, alpha, dt, plotter,L2,Linf);
-
 
 #ifdef _MPI_
  t0 += MPI_Wtime();
