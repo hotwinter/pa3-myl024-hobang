@@ -66,97 +66,107 @@ enum { NORTH = 0, EAST, WEST, SOUTH };
 //   cells to the neighboring process, which also produces the data for
 //   the boundary ghost cells. 
 
+const int CORNER_SIZE = 1;
+const int PAD_SIZE = 2;
+
 void communicate(double *E_prev)
 {
+	const int FARTHEST_NORTH = 0;
+	const int FARTHEST_WEST = 0;		
+	const int FARTHEST_SOUTH = cb.py - 1;
+	const int FARTHEST_EAST = cb.px - 1; 
+	
 	int i, j;
 	MPI_Request sendReqs[4];
 	MPI_Request recvReqs[4];
 	MPI_Status  statuses[4];
-
+	
 	int msgCounter = 0;
 
-	// Send the NORTH boundary & fill the NORTH ghost cells
-	if (my_pi == 0)
+	if (my_pi == FARTHEST_NORTH)
 	{
-		for (i = 1; i < my_n + 1; ++i)
+		for (i = (0 + CORNER_SIZE); i < my_n + CORNER_SIZE; ++i)
 		{
-			E_prev[i] = E_prev[i + 2*(my_n + 2)];
+			E_prev[i] = E_prev[i + 2*(my_n + PAD_SIZE)];
 		}
 	}
-	else
+	else 	//Send the NORTH boundary & fill the NORTH ghost cells
 	{
-		MPI_Irecv(&E_prev[1], my_n, MPI_DOUBLE, my_rank - cb.px, SOUTH, MPI_COMM_WORLD, recvReqs + msgCounter);
-		MPI_Isend(&E_prev[my_n + 3], my_n, MPI_DOUBLE, my_rank - cb.px, NORTH, MPI_COMM_WORLD, sendReqs + 0);
+		MPI_Irecv(&E_prev[CORNER_SIZE], my_n, MPI_DOUBLE, my_rank - cb.px, SOUTH, MPI_COMM_WORLD, recvReqs + msgCounter);
+		MPI_Isend(&E_prev[my_n + PAD_SIZE+CORNER_SIZE], my_n, MPI_DOUBLE, my_rank - cb.px, NORTH, MPI_COMM_WORLD, sendReqs + 0);
+
 		msgCounter++;
 	}
 
-	// Send the SOUTH boundary & fill the SOUTH ghost cells
-	if (my_pi == cb.py - 1)
+	if (my_pi == FARTHEST_SOUTH)
 	{
-		for (i = (my_m + 1)*(my_n + 2) + 1; i < (my_m + 2)*(my_n + 2) - 1; ++i)
+		for (i = (my_m + CORNER_SIZE)*(my_n + PAD_SIZE) + CORNER_SIZE; i < (my_m + PAD_SIZE)*(my_n + PAD_SIZE) - CORNER_SIZE; ++i)
 		{
-			E_prev[i] = E_prev[i - 2*(my_n + 2)];
+			E_prev[i] = E_prev[i - 2*(my_n + PAD_SIZE)];
 		}
 	}
-	else
+	else	// Send the SOUTH boundary & fill the SOUTH ghost cells
 	{
-		MPI_Irecv(&E_prev[(my_m + 1)*(my_n + 2) + 1], my_n, MPI_DOUBLE, my_rank + cb.px, NORTH, MPI_COMM_WORLD, recvReqs + msgCounter);
-		MPI_Isend(&E_prev[my_m*(my_n + 2) + 1], my_n, MPI_DOUBLE, my_rank + cb.px, SOUTH, MPI_COMM_WORLD, sendReqs + 1);
+		MPI_Irecv(&E_prev[(my_m + CORNER_SIZE)*(my_n + PAD_SIZE) + CORNER_SIZE], my_n, MPI_DOUBLE, my_rank + cb.px, NORTH, MPI_COMM_WORLD, recvReqs + msgCounter);
+		MPI_Isend(&E_prev[my_m*(my_n + PAD_SIZE) + CORNER_SIZE], my_n, MPI_DOUBLE, my_rank + cb.px, SOUTH, MPI_COMM_WORLD, sendReqs + 1);
+
 		msgCounter++;
 	}
 
-	// Send the WEST boundary & fill the WEST ghost cells
-	if (my_pj == 0)
+	if (my_pj == FARTHEST_WEST) 
 	{
-		for (i = my_n + 2; i < (my_m + 1)*(my_n + 2); i += my_n + 2)
+		for (i = my_n + PAD_SIZE; i < (my_m + CORNER_SIZE)*(my_n + PAD_SIZE); i += (my_n + PAD_SIZE))
 		{
 			E_prev[i] = E_prev[i + 2];
 		}
 	}
-	else
+	else	// Send the WEST boundary & fill the WEST ghost cells
 	{
-		for (i = my_n + 3, j = 0; j < my_m; i += my_n + 2, ++j)
+		for (i = my_n + PAD_SIZE + CORNER_SIZE, j = 0; j < my_m; i += my_n + PAD_SIZE, ++j)
 		{
 			out_W[j] = E_prev[i];
 		}
+
 		MPI_Irecv(in_W, my_m, MPI_DOUBLE, my_rank - 1, EAST, MPI_COMM_WORLD, recvReqs + msgCounter);
 		MPI_Isend(out_W, my_m, MPI_DOUBLE, my_rank - 1, WEST, MPI_COMM_WORLD, sendReqs + 2);
+	
 		msgCounter++;
 	}
 
-	// Send the EAST boundary & fill the EAST ghost cells
-	if (my_pj == cb.px - 1)
+	if (my_pj == FARTHEST_EAST)
 	{
-		for (i = (my_n + 1) + 1*(my_n + 2); i < (my_n + 1) + (my_m + 1)*(my_n + 2); i += my_n + 2)
+		for (i = (my_n + CORNER_SIZE) + 1*(my_n + PAD_SIZE); i < (my_n + CORNER_SIZE) + (my_m + CORNER_SIZE)*(my_n + PAD_SIZE); i += (my_n + PAD_SIZE))
 		{
 			E_prev[i] = E_prev[i - 2];
 		}
 	}
-	else
+	else	// Send the EAST boundary & fill the EAST ghost cells
 	{
-		for (i = (my_n + 1) + (my_n + 2), j = 0; j < my_m; i += my_n + 2, ++j)
+		for (i = (my_n + CORNER_SIZE) + (my_n + PAD_SIZE), j = 0; j < my_m; i += (my_n + PAD_SIZE), ++j)
 		{
 			out_E[j] = E_prev[i];
 		}
+
 		MPI_Irecv(in_E, my_m, MPI_DOUBLE, my_rank + 1, WEST, MPI_COMM_WORLD, recvReqs + msgCounter);
 		MPI_Isend(out_E, my_m, MPI_DOUBLE, my_rank + 1, EAST, MPI_COMM_WORLD, sendReqs + 3);
+
 		msgCounter++;
 	}
 
 	// Wait for all messages to be received before unpacking data for WEST and EAST messages
 	MPI_Waitall(msgCounter, recvReqs, statuses);
 
-	if (my_pj != 0)
+	if (my_pj != FARTHEST_WEST)
 	{
-		for (i = my_n + 2, j = 0; j < my_m; i += my_n + 2, ++j) 		
+		for (i = my_n + PAD_SIZE, j = 0; j < my_m; i += my_n + PAD_SIZE, ++j) 		
 		{
 			E_prev[i] = in_W[j];
 		}
 	}
 
-	if (my_pj != cb.px - 1)
+	if (my_pj != FARTHEST_EAST)
 	{
-		for (i = (my_n + 1) + (my_n + 2), j = 0; j < my_m; i += my_n + 2, ++j)
+		for (i = (my_n + CORNER_SIZE) + (my_n + PAD_SIZE), j = 0; j < my_m; i += my_n + PAD_SIZE, ++j)
 		{
 			E_prev[i] = in_E[j];
 		}
@@ -189,6 +199,7 @@ double accumulateResults(double *E, double dt, double *mx, double *sumSq)
 	{
 		MPI_Send(sumSq, 1, MPI_DOUBLE, 0, 256, MPI_COMM_WORLD);
 	}
+
 	return l2norm;
 }
 
@@ -205,14 +216,14 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 	double mx, sumSq;
 	int niter;
 	int m = cb.m, n=cb.n;
-	int innerBlockRowStartIndex = (my_n+2)+1;
-	int innerBlockRowEndIndex = (((my_m+2)*(my_n+2) - 1) - (my_n)) - (my_n+2);
-
+	int innerBlockRowStartIndex = (my_n+PAD_SIZE)+CORNER_SIZE;
+	int innerBlockRowEndIndex = (((my_m+PAD_SIZE)*(my_n+PAD_SIZE) - CORNER_SIZE) - (my_n)) - (my_n+PAD_SIZE);
 
 	// We continue to sweep over the mesh until the simulation has reached
 	// the desired number of iterations
 	for (niter = 0; niter < cb.niters; niter++)
 	{
+		/*
 		if (cb.debug && (niter==0))
 		{
 			accumulateResults(E_prev, dt, &mx, &sumSq);
@@ -242,8 +253,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 				//plotter->updatePlot(E,  -1, m+1, n+1);
 			}
 		}
-
-		int i, j;
+		*/
 
 		communicate(E_prev);
 
@@ -253,13 +263,13 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 
 	#ifdef FUSED
 		// Solve for the excitation, a PDE
-		for (j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+= my_n + 2)
+		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+= my_n + PAD_SIZE)
 		{
 			E_tmp = E + j;
 			E_prev_tmp = E_prev + j;
 			R_tmp = R + j;
 
-			for (i = 0; i < my_n; i++)
+			for (int i = 0; i < my_n; i++)
 			{
 				E_tmp[i] = E_prev_tmp[i]+alpha*(E_prev_tmp[i+1]+E_prev_tmp[i-1]-4*E_prev_tmp[i]+E_prev_tmp[i+(my_n+2)]+E_prev_tmp[i-(my_n+2)]);
 				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
@@ -268,12 +278,12 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		}
 	#else
 		// Solve for the excitation, a PDE
-		for (j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_n + 2)
+		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_n + PAD_SIZE)
 		{
 			E_tmp = E + j;
 			E_prev_tmp = E_prev + j;
 
-			for (i = 0; i < my_n; ++i)
+			for (int i = 0; i < my_n; ++i)
 			{
 				E_tmp[i] = E_prev_tmp[i]+alpha*(E_prev_tmp[i+1]+E_prev_tmp[i-1]-4*E_prev_tmp[i]+E_prev_tmp[i+(my_n+2)]+E_prev_tmp[i-(my_n+2)]);
 			}
@@ -284,11 +294,11 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		 *     to the next timtestep
 		 */
 
-		for (j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_n + 2)
+		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_n + PAD_SIZE)
 		{
 			E_tmp = E + j;
 			R_tmp = R + j;
-			for (i = 0; i < my_n; ++i)
+			for (int i = 0; i < my_n; ++i)
 			{
 				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
 				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
@@ -318,15 +328,16 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		}
 
 		// Swap current and previous meshes
-		double *tmp = E; E = E_prev; E_prev = tmp;
+		double *tmp = E; 
+		E = E_prev; 
+		E_prev = tmp;
 
 	} //end of 'niter' loop at the beginning
 
 	// return the L2 and infinity norms via in-out parameters
 	//stats(E_prev, my_m, my_n, &Linf, &sumSq);
 	//L2 = L2Norm(sumSq);
-
-	L2 = accumulateResults(E_prev, dt, &Linf, &sumSq);
+	//L2 = accumulateResults(E_prev, dt, &Linf, &sumSq);
 
 	// Swap pointers so we can re-use the arrays
 	*_E = E;
