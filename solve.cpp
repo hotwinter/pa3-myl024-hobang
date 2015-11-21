@@ -179,28 +179,8 @@ void accumulateResults(double* E, double dt, double* mx, double* L2)
 		*mx = maxNorm;
 //		printf("reduced sum, l2  : %f, %f \n", reducedSq, *L2);
 		
-		///repNorms(l2norm, *mx, dt, cb.m, cb.n, -1, cb.stats_freq);
+		//repNorms(l2norm, *mx, dt, cb.m, cb.n, -1, cb.stats_freq); //repNorms is only needed for debug
 	}
-/*
-	if (my_rank == 0)
-	{
-		double src_sumSq;
-		MPI_Status status;
-
-		for (int src_rank = 1; src_rank < cb.px*cb.py; ++src_rank)
-		{
-			MPI_Recv(&src_sumSq, 1, MPI_DOUBLE, MPI_ANY_SOURCE, 256, MPI_COMM_WORLD, &status);
-			*sumSq += src_sumSq;
-		}
-		l2norm = L2Norm(*sumSq);
-		repNorms(l2norm, *mx, dt, my_m, my_n, -1, cb.stats_freq);
-	}
-	else
-	{
-		MPI_Send(sumSq, 1, MPI_DOUBLE, 0, 256, MPI_COMM_WORLD);
-	}
-*/
-	
 
 }
 
@@ -224,37 +204,10 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 	// the desired number of iterations
 	for (niter = 0; niter < cb.niters; niter++)
 	{
-		/*
-		if (cb.debug && (niter==0))
+		if (cb.plot_freq)
 		{
-			accumulateResults(E_prev, dt, &mx, &sumSq);
-
-//			stats(E_prev, my_m, my_n, &mx, &sumSq);
-//
-//			if (my_rank == 0)
-//			{
-//				double src_sumSq;
-//				MPI_Status status;
-//
-//				for (int src_rank = 1; src_rank < cb.px*cb.py; ++src_rank)
-//				{
-//					MPI_Recv(&src_sumSq, 1, MPI_DOUBLE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-//					sumSq += src_sumSq;
-//				}
-//				double l2norm = L2Norm(sumSq);
-//				repNorms(l2norm, mx, dt, my_m, my_n, -1, cb.stats_freq);
-//			}
-//			else
-//			{
-//				MPI_Send(&sumSq, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
-//			}
-
-			if (cb.plot_freq)
-			{
-				//plotter->updatePlot(E,  -1, m+1, n+1);
-			}
+			//plotter->updatePlot(E,  -1, m+1, n+1);
 		}
-		*/
 
 		communicate(E_prev);
 
@@ -307,18 +260,6 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		}
 	#endif
 		/////////////////////////////////////////////////////////////////////////////////
-/*
-		if (cb.stats_freq)
-		{
-			if (!(niter % cb.stats_freq))
-			{
-				accumulateResults(E, dt, &mx, &sumSq);
-
-//				stats(E, my_m, my_n, &mx, &sumSq);
-//				double l2norm = L2Norm(sumSq);
-//				repNorms(l2norm, mx, dt, my_m, my_n, niter, cb.stats_freq);
-			}
-		}
 
 		if (cb.plot_freq)
 		{
@@ -327,16 +268,13 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 				//plotter->updatePlot(E,  niter, m, n);
 			}
 		}
-*/
+
 		// Swap current and previous meshes
 		double *tmp = E; 
 		E = E_prev; 
 		E_prev = tmp;
 
 	} //end of 'niter' loop at the beginning
-
-	//stats(E_prev, my_m, my_n, &Linf, &sumSq);
-	//L2 = L2Norm(sumSq);
 	
 	accumulateResults(E_prev, dt, &Linf, &L2);
 
