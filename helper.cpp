@@ -43,8 +43,8 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 {
 	// By now, global variables my_rank, my_m, my_n have already been set
 
-	int px = cb.px;
-	int py = cb.py;
+	//int px = cb.px;
+	//int py = cb.py;
 
 	int nMin = n / cb.px;
 	int mMin = m / cb.py;
@@ -58,14 +58,22 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 	///////////////////////////////////////////////////////////////////////////////////////
 
 	int iMin = my_pi*mMin + min(my_pi, ry); // GLOBAL index of the first row of the "computational" block (ignoring ghost cells)
-	int di = (m + 1)/2 - iMin; // Distance from iMin to the last row of 0.0s
+	int di = min((cb.m + 1)/2 - iMin, my_m - 1); // Distance from iMin to the last row of 0.0s
 
 	for (int i = my_n + 2; i < (di + 1)*(my_n + 2); ++i)
 	{
+		if (i >= (my_m + 2)*(my_n + 2))
+		{
+			printf("OH NOES.............................................\n\n\n");
+		}
 		R[i] = 0.0;
 	}
-	for (int i = (di + 1)*(my_n + 2); i< (my_m + 1)*(my_n + 2); ++i)
+	for (int i = (di + 1)*(my_n + 2); i < (my_m + 1)*(my_n + 2); ++i)
 	{
+		if (i >= (my_m + 2)*(my_n + 2))
+		{
+			printf("OH NOES.............................................\n\n\n");
+		}
 		R[i] = 1.0;
 	}
 
@@ -95,9 +103,9 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 
 	// We only print the meshes if they are small enough
 	
-//	printf("\n\nRANK %d INITIAL CONDITIONS:\n\n", my_rank);
-//	printMat("E_prev", E_prev, my_m, my_n);
-//	printMat("R", R, my_m, my_n);
+	printf("\n\nRANK %d INITIAL CONDITIONS:\n\n", my_rank);
+	printMat("E_prev", E_prev, my_m, my_n);
+	printMat("R", R, my_m, my_n);
 }
 
 // NOTE: This gets called with arguments (cb.m+2, cb.n+2) in apf.cpp
