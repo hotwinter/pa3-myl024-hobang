@@ -58,23 +58,22 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 	///////////////////////////////////////////////////////////////////////////////////////
 
 	int iMin = my_pi*mMin + min(my_pi, ry); // GLOBAL index of the first row of the "computational" block (ignoring ghost cells)
-	int di = min((cb.m + 1)/2 - iMin, my_m - 1); // Distance from iMin to the last row of 0.0s
+	int di = min((cb.m + 1)/2 - iMin, my_m); // Distance from iMin to the first row of 1.0s
 
-	for (int i = my_n + 2; i < (di + 1)*(my_n + 2); ++i)
+	for (int i = 0; i < (my_m + 2)*(my_n + 2); ++i)
 	{
-		if (i >= (my_m + 2)*(my_n + 2))
+		int rowIndex = i / (my_n + 2);
+		int colIndex = i % (my_n + 2);
+
+		if (rowIndex == 0 || rowIndex == my_m + 1 || rowIndex <= di ||
+			colIndex == 0 || colIndex == my_n + 1)
 		{
-			printf("OH NOES.............................................\n\n\n");
+			R[i] = 0.0;
 		}
-		R[i] = 0.0;
-	}
-	for (int i = (di + 1)*(my_n + 2); i < (my_m + 1)*(my_n + 2); ++i)
-	{
-		if (i >= (my_m + 2)*(my_n + 2))
+		else
 		{
-			printf("OH NOES.............................................\n\n\n");
+			R[i] = 1.0;
 		}
-		R[i] = 1.0;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -83,7 +82,7 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 	///////////////////////////////////////////////////////////////////////////////
 
 	int jMin = my_pj*nMin + min(my_pj, rx);
-	int dj = (n + 1)/2 - jMin;
+	int dj = min((cb.n + 1)/2 - jMin, my_n);
 
 	for (int i = 0; i < (my_m + 2)*(my_n + 2); ++i)
 	{
