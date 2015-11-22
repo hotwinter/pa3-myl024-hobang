@@ -32,9 +32,12 @@ void repNorms(double l2norm, double mx, double dt, int m,int n, int niter, int s
 void stats(double *E, int m, int n, double *_mx, double *sumSq);
 void printMat(const char*, double*, int m, int n);
 
-const int CORNER_SIZE = 1;
-const int PAD_SIZE = 2;
-const int ROOT = 0;
+#define CORNER_SIZE 1
+#define PAD_SIZE 2
+#define ROOT 0
+
+#define FARTHEST_NORTH 0
+#define FARTHEST_WEST 0
 
 enum { NORTH = 0, EAST, WEST, SOUTH };
 
@@ -58,8 +61,6 @@ double L2Norm(double sumSq)
 
 void communicate(double *E_prev)
 {
-	const int FARTHEST_NORTH = 0;
-	const int FARTHEST_WEST = 0;		
 	const int FARTHEST_SOUTH = cb.py - 1;
 	const int FARTHEST_EAST = cb.px - 1; 
 	
@@ -159,8 +160,8 @@ void communicate(double *E_prev)
 		}
 	}
 
-	printf("RANK %d's E_prev with ghost cells filled:\n", my_rank);
-	printMat("", E_prev, my_m, my_n);
+	//printf("RANK %d's E_prev with ghost cells filled:\n", my_rank);
+	//printMat("", E_prev, my_m, my_n);
 }
 
 
