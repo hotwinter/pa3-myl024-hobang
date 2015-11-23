@@ -110,7 +110,7 @@ void communicate(double *E_prev)
 	}
 	else	// Send the WEST boundary & fill the WEST ghost cells
 	{
-		for (i = my_n + PAD_SIZE + CORNER_SIZE, j = 0; j < my_m; i += my_n + PAD_SIZE, ++j)
+		for (i = my_n + PAD_SIZE + 1, j = 0; j < my_m; i += my_n + PAD_SIZE, ++j)
 		{
 			out_W[j] = E_prev[i];
 		}
@@ -130,7 +130,7 @@ void communicate(double *E_prev)
 	}
 	else	// Send the EAST boundary & fill the EAST ghost cells
 	{
-		for (i = (my_n + CORNER_SIZE) + (my_n + PAD_SIZE), j = 0; j < my_m; i += (my_n + PAD_SIZE), ++j)
+		for (i = my_n + (my_n + PAD_SIZE), j = 0; j < my_m; i += (my_n + PAD_SIZE), ++j)
 		{
 			out_E[j] = E_prev[i];
 		}
@@ -165,27 +165,6 @@ void communicate(double *E_prev)
 }
 
 
-void accumulateResults(double* E, double dt, double* mx, double* L2)
-{	
-	double maxNorm = 0;
-	double reducedSq = 0.0;	
-	double sumSq = 0.0;
-	stats(E, my_m, my_n, mx, &sumSq);	
-
-	MPI_Reduce(&sumSq, &reducedSq, 1, MPI_DOUBLE, MPI_SUM, ROOT, MPI_COMM_WORLD);
-	MPI_Reduce(mx, &maxNorm, 1, MPI_DOUBLE, MPI_MAX, ROOT, MPI_COMM_WORLD);
-
-	if(my_rank == 0) {
-		*L2 = L2Norm(reducedSq);
-		*mx = maxNorm;
-//		printf("reduced sum, l2  : %f, %f \n", reducedSq, *L2);
-		
-		//repNorms(l2norm, *mx, dt, cb.m, cb.n, -1, cb.stats_freq); //repNorms is only needed for debug
-	}
-
-}
-
-
 void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plotter *plotter, double &L2, double &Linf)
 {
 	// Simulated time is different from the integer timestep number
@@ -197,7 +176,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 	double *E_prev_tmp = *_E_prev;
 	double mx, sumSq;
 	int niter;
-	int m = cb.m, n=cb.n;
+	//int m = cb.m, n=cb.n;
 	int innerBlockRowStartIndex = (my_n+PAD_SIZE)+CORNER_SIZE;
 	int innerBlockRowEndIndex = (((my_m+PAD_SIZE)*(my_n+PAD_SIZE) - CORNER_SIZE) - (my_n)) - (my_n+PAD_SIZE);
 
@@ -211,6 +190,12 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		}
 
 		communicate(E_prev);
+
+		if (niter == 0)
+		{
+			//printf("RANK %d's E_prev with ghost cells filled:\n", my_rank);
+			//printMat("", E_prev, my_m, my_n);
+		}
 
 		//////////////////////////////////////////////////////////////////////////////
 
@@ -275,9 +260,21 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		E = E_prev; 
 		E_prev = tmp;
 
+		if (niter == 99)
+		{
+			printf("RANK %d's E_prev:\n", my_rank);
+			printMat("", E_prev, my_m, my_n);
+		}
 	} //end of 'niter' loop at the beginning
 	
-	accumulateResults(E_prev, dt, &Linf, &L2);
+	double reducedSq = 0.0;	
+
+	stats(E_prev, my_m, my_n, &mx, &sumSq);	
+
+	MPI_Reduce(&sumSq, &reducedSq, 1, MPI_DOUBLE, MPI_SUM, ROOT, MPI_COMM_WORLD);
+	MPI_Reduce(&mx, &Linf, 1, MPI_DOUBLE, MPI_MAX, ROOT, MPI_COMM_WORLD);
+
+	L2 = L2Norm(reducedSq);
 
 	// Swap pointers so we can re-use the arrays
 	*_E = E;

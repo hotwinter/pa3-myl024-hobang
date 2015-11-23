@@ -137,7 +137,7 @@ void printMat(const char mesg[], double *E, int m, int n)
 {
 	if (m > 8)
 	{
-		return;
+		//return;
 	}
 	printf("%s\n", mesg);
 
