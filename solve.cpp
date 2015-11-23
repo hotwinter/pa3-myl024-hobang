@@ -180,6 +180,21 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 	int innerBlockRowStartIndex = (my_n+PAD_SIZE)+CORNER_SIZE;
 	int innerBlockRowEndIndex = (((my_m+PAD_SIZE)*(my_n+PAD_SIZE) - CORNER_SIZE) - (my_n)) - (my_n+PAD_SIZE);
 
+	__m128d cc, nn, ee, ww, ss; // vectorized stencil
+	__m128d EE;//, RR;
+
+	__m128d alpha_alpha = _mm_set1_pd(alpha);
+	__m128d four_four = _mm_set1_pd(4.0);
+
+//	__m128d a_a = _mm_set1_pd(a);
+//	__m128d bm1_bm1 = _mm_set1_pd(b - 1);
+//	__m128d M1_M1 = _mm_set1_pd(M1);
+//	__m128d M2_M2 = _mm_set1_pd(M2);
+//	__m128d kk_kk = _mm_set1_pd(kk);
+//	__m128d dt_dt = _mm_set1_pd(dt);
+//	__m128d epsilon_epsilon = _mm_set1_pd(epsilon);
+//	__m128d one_one = _mm_set1_pd(1.0);
+
 	// We continue to sweep over the mesh until the simulation has reached
 	// the desired number of iterations
 	for (niter = 0; niter < cb.niters; niter++)
@@ -219,8 +234,22 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 			E_tmp = E + j;
 			E_prev_tmp = E_prev + j;
 
-			for (int i = 0; i < my_n; ++i)
+			ww = _mm_loadu_pd(E_prev_tmp - 1);
+
+			for (int i = 0; i < my_n; i += 2)
 			{
+				ww = ee;
+				cc = _mm_loadu_pd(E_prev_tmp + i + 0);
+				ee = _mm_loadu_pd(E_prev_tmp + i + 1);
+				nn = _mm_loadu_pd(E_prev_tmp + i - (my_n + 2));
+				ss = _mm_loadu_pd(E_prev_tmp + i + (my_n + 2));
+
+				EE = _mm_add_pd(cc, _mm_mul_pd(alpha_alpha, _mm_sub_pd(_mm_add_pd(ww, _mm_add_pd(ee, _mm_add_pd(nn, ss))), _mm_mul_pd(four_four, cc))));
+				_mm_storeu_pd(E_tmp + i, EE);
+			}
+			if (my_n % 2 == 1)
+			{
+				int i = my_n - 1;
 				E_tmp[i] = E_prev_tmp[i]+alpha*(E_prev_tmp[i+1]+E_prev_tmp[i-1]-4*E_prev_tmp[i]+E_prev_tmp[i+(my_n+2)]+E_prev_tmp[i-(my_n+2)]);
 			}
 		}
@@ -234,6 +263,23 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		{
 			E_tmp = E + j;
 			R_tmp = R + j;
+
+//			for (int i = 0; i < my_n; i += 2)
+//			{
+//				EE = _mm_loadu_pd(E_tmp);
+//				RR = _mm_loadu_pd(R_tmp);
+//
+//				EE = _mm_sub_pd(EE,_mm_mul_pd(dt_dt, _mm_mul_pd(EE, _mm_mul_pd(_mm_sub_pd(EE, aa), _mm_mul_pd(_mm_sub_pd(EE, one_one), _mm_mul_pd(EE, RR))))));
+//
+//				RR = _mm_add_pd(EE,_mm_mul_pd(dt_dt, _mm_add_pd(epsilon_epsilon, _mm_mul_pd(M1_m1, _mm_mul_pd(_mm_div_pd(RR, _mm_add_pd(EE, M2))), ))));
+//				_mm_sub_pd(_mm_mul_pd(one_one))
+//			}
+//			if (my_n % 2 == 1)
+//			{
+//				int i = my_n - 1;
+//				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
+//				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
+//			}
 			for (int i = 0; i < my_n; ++i)
 			{
 				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
