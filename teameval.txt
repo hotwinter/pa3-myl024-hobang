@@ -13,33 +13,39 @@ If you worked alone leave column B blank
 
 (1) List the names of your team members:
 
-A:
+A: Honam Bang
 
  
-B:
+B: Myron Liu
 
  
  
 (2) Estimate how much time each team member devoted to this project, in HOURS.
 
   	                        A 	       B
-meetings 	  	  	 
-coding 	  	  	 
-writeup 	  	  	 
-planning (alone) 	  	  	 
-total (including meetings) 	  	  	 
+meetings                      20              20	  	  	 
+coding 	  	  	      20              20
+writeup 	  	      10              10
+planning (alone) 	       8               8  	  	 
+total (including meetings)    68              68	  	  	 
 
 
 (3) Discuss the following.
 (a) If you worked in a team, what were the major responsibilities
     of each team member?
-(b) Did you complete the assignment?
+    Myron : coding communication among processes
+    Honam : debugging and coding MPI_Reduce to calculate correctness
+(b) Did you complete the assignment? Yes
 (c) What were your major strengths and weaknesses in doing this
     assignment (individually or in a team)?
     If in a team, also discuss how your team worked together.
+Our collaboration worked well for this time. We will keep working in the same way.
 (d) What  lessons did you learn from these events.
+Don't underestimate multi-processing power, there are many factors we should consider when we do programming (cache/communication cost/computation)
+
 (e) If in a team, whether and how you plan to change the way
     your work together .
+We would try to discuss a lot more.
 (f) Anything else that comes to mind.
-
+None
 
