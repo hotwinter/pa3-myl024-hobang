@@ -189,8 +189,10 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 			//plotter->updatePlot(E,  -1, m+1, n+1);
 		}
 
-		communicate(E_prev);
-
+		if(!cb.noComm)
+		{
+			communicate(E_prev);
+		} 
 		//////////////////////////////////////////////////////////////////////////////
 
 		// #define FUSED 1
