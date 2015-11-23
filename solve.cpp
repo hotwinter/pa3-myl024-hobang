@@ -191,12 +191,6 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 
 		communicate(E_prev);
 
-		if (niter == 0)
-		{
-			//printf("RANK %d's E_prev with ghost cells filled:\n", my_rank);
-			//printMat("", E_prev, my_m, my_n);
-		}
-
 		//////////////////////////////////////////////////////////////////////////////
 
 		// #define FUSED 1
@@ -259,12 +253,6 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		double *tmp = E; 
 		E = E_prev; 
 		E_prev = tmp;
-
-		if (niter == 99)
-		{
-			printf("RANK %d's E_prev:\n", my_rank);
-			printMat("", E_prev, my_m, my_n);
-		}
 	} //end of 'niter' loop at the beginning
 	
 	double reducedSq = 0.0;	
