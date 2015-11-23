@@ -24,8 +24,20 @@ echo
 
 echo ">>> Job Starts"
 date
+ibrun -np 512 ./apf -n 400 -i 500 -x 8 -y 64
+ibrun -np 512 ./apf -n 400 -i 500 -x 64 -y 8
+ibrun -np 512 ./apf -n 400 -i 500 -x 16 -y 32 
+ibrun -np 512 ./apf -n 400 -i 500 -x 32 -y 16
+
+ibrun -np 512 ./apf -n 1800 -i 2000 -x 8 -y 64
+ibrun -np 512 ./apf -n 1800 -i 2000 -x 64 -y 8
+ibrun -np 512 ./apf -n 1800 -i 2000 -x 16 -y 32 
+ibrun -np 512 ./apf -n 1800 -i 2000 -x 32 -y 16
+
+ibrun -np 512 ./apf -n 8000 -i 2000 -x 8 -y 64
+ibrun -np 512 ./apf -n 8000 -i 2000 -x 64 -y 8
+ibrun -np 512 ./apf -n 8000 -i 2000 -x 16 -y 32 
 ibrun -np 512 ./apf -n 8000 -i 2000 -x 32 -y 16
-ibrun -np 512 ./apf -n 8000 -i 2000 -x 16 -y 32
-ibrun -np 512 ./apf -n 8000 -i 2000 -x 16 -y 32 -k
+
 date
 echo ">>> Job Ends"
