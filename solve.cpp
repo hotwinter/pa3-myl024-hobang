@@ -31,7 +31,7 @@ extern control_block cb;
 
 void repNorms(double l2norm, double mx, double dt, int m,int n, int niter, int stats_freq);
 void stats(double *E, double *_mx, double *sumSq);
-void printMat(const char*, double*, int m, int n);
+void printMat(const char*, double*);
 
 #define ROOT 0
 
@@ -160,7 +160,7 @@ void communicate(double *E_prev)
 	}
 
 	//printf("RANK %d's E_prev with ghost cells filled:\n", my_rank);
-	//printMat("", E_prev, my_m, my_n);
+	//printMat("", E_prev);
 }
 
 
@@ -235,14 +235,14 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 
 			//ww = _mm_loadu_pd(E_prev_tmp - 1);
 
-			for (int i = 0; i < my_n; i += 2)
+			for (int i = 0; i < my_stride - 2; i += 2)
 			{
 				//ww = ee;
 				ww = _mm_loadu_pd(E_prev_tmp + i - 1);
 				cc = _mm_loadu_pd(E_prev_tmp + i + 0);
 				ee = _mm_loadu_pd(E_prev_tmp + i + 1);
-				nn = _mm_loadu_pd(E_prev_tmp + i - (my_n + 2));
-				ss = _mm_loadu_pd(E_prev_tmp + i + (my_n + 2));
+				nn = _mm_loadu_pd(E_prev_tmp + i - my_stride);
+				ss = _mm_loadu_pd(E_prev_tmp + i + my_stride);
 
 				EE = _mm_add_pd(cc, _mm_mul_pd(alpha_alpha, _mm_sub_pd(_mm_add_pd(ww, _mm_add_pd(ee, _mm_add_pd(nn, ss))), _mm_mul_pd(four_four, cc))));
 				_mm_storeu_pd(E_tmp + i, EE);
@@ -264,7 +264,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 			E_tmp = E + j;
 			R_tmp = R + j;
 
-			for (int i = 0; i < my_n; i += 2)
+			for (int i = 0; i < my_stride - 2; i += 2)
 			{
 				EE = _mm_loadu_pd(E_tmp + i);
 				RR = _mm_loadu_pd(R_tmp + i);

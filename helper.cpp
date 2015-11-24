@@ -28,7 +28,7 @@ int my_stride;
 // suggests that it's just better to do the (un)packing ourselves.
 double *in_W, *in_E, *out_W, *out_E;
 
-void printMat(const char mesg[], double *E, int m, int n);
+void printMat(const char mesg[], double *E);
 
 inline int min(int a, int b) { if (a < b) return a; else return b; }
 inline int max(int a, int b) { if (a > b) return a; else return b; }
@@ -101,9 +101,10 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 
 	// We only print the meshes if they are small enough
 	
-	//printf("\n\nRANK %d INITIAL CONDITIONS:\n\n", my_rank);
-	//printMat("E_prev", E_prev, my_m, my_n);
-	//printMat("R", R, my_m, my_n);
+//	printf("\n\nRANK %d INITIAL CONDITIONS:\n\n", my_rank);
+//	printf("RANK %d my_stride is: %d\n", my_rank, my_stride);
+//	printMat("E_prev", E_prev);
+//	printMat("R", R);
 }
 
 // NOTE: This gets called with arguments (cb.m+2, cb.n+2) in apf.cpp
@@ -120,7 +121,7 @@ double *alloc1D(int mPlus2,int nPlus2)
 	my_m = m / cb.py + (my_pi < (m % cb.py));
 	my_n = n / cb.px + (my_pj < (n % cb.px));
 
-	my_stride = (my_n % 2 == 0) ? my_m + 2 : my_m + 3;
+	my_stride = (my_n % 2 == 0) ? my_n + 2 : my_n + 3;
 
 	// Allocate contiguous memory for the WESTward and EASTward messages
 	in_W  = new double[4*my_m];
@@ -137,20 +138,20 @@ double *alloc1D(int mPlus2,int nPlus2)
 	return(E);
 }
 
-void printMat(const char mesg[], double *E, int m, int n)
+void printMat(const char mesg[], double *E)
 {
-	if (m > 8)
+	if (my_m > 8)
 	{
 		//return;
 	}
 	printf("%s\n", mesg);
 
-	for (int i = 0; i < (m + 2)*(n + 2); ++i)
+	for (int i = 0; i < (my_m + 2)*my_stride; ++i)
 	{
-		int rowIndex = i / (n + 2);
-		int colIndex = i % (n + 2);
+		int rowIndex = i / my_stride;
+		int colIndex = i % my_stride;
 
-		if ((colIndex == 0 || colIndex == n + 1) && (rowIndex == 0 || rowIndex == m+1))
+		if ((colIndex == 0 || colIndex >= my_n + 1) && (rowIndex == 0 || rowIndex == my_m + 1))
 		{
 			printf("      ");
 		}
@@ -166,7 +167,7 @@ void printMat(const char mesg[], double *E, int m, int n)
 //				printf("%6.3f ", E[i]);
 //			}
 //		}
-		if (colIndex == n+1)
+		if (colIndex == my_stride - 1)
 		{
 			printf("\n");
 		}
@@ -179,12 +180,12 @@ void stats(double *E, double *_mx, double *sumSq)
 	double mx = -1;
 	double _sumSq = 0;
  
-	for (int i = 0; i< (my_m + 2)*my_stride; ++i)
+	for (int i = 1 + my_stride; i < (my_m + 1)*my_stride; ++i)
 	{
-		int rowIndex = i / (my_stride);           // gives the current row number in 2D array representation
-		int colIndex = i % (my_stride);       // gives the base index (first row's) of the current index      
+		int rowIndex = i / my_stride;           // gives the current row number in 2D array representation
+		int colIndex = i % my_stride;       // gives the base index (first row's) of the current index      
  
-		if (colIndex == 0 || colIndex >= my_n +1 || rowIndex == 0 || rowIndex == my_m + 1)
+		if (colIndex == 0 || colIndex >= my_n +1)
 		{
 			continue;
 		}
