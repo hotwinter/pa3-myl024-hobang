@@ -133,7 +133,8 @@ double *alloc1D(int mPlus2,int nPlus2)
 	// Pad the subproblem to accomodate E_prev's ghost cells
 	// We also pad R, although this is redundant and just for consistency
 	double *E;
-	assert(E = (double*)memalign(16, sizeof(double)*(my_m + 2)*my_stride));
+	assert(E = (double*)memalign(16, sizeof(double)*((my_m + 2)*my_stride + 1)));
+	E++;
 
 	return(E);
 }
@@ -160,13 +161,6 @@ void printMat(const char mesg[], double *E)
 			printf("%1.3f ", E[i]); // For testing purposes, we also print the ghost cells
 		}
 
-//		if ((colIndex>0) && (colIndex<n+1))
-//		{
-//			if ((rowIndex > 0) && (rowIndex < m+1))
-//			{
-//				printf("%6.3f ", E[i]);
-//			}
-//		}
 		if (colIndex == my_stride - 1)
 		{
 			printf("\n");

@@ -164,13 +164,13 @@ void communicate(double *E_prev)
 }
 
 
-void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Plotter *plotter, double &L2, double &Linf)
+void solve(double **_E, double **_E_prev, double **_R, double alpha, double dt, Plotter *plotter, double &L2, double &Linf)
 {
 	// Simulated time is different from the integer timestep number
 	double t = 0.0;
 	
-	double *E = *_E, *E_prev = *_E_prev;
-	double *R_tmp = R;
+	double *E = *_E, *E_prev = *_E_prev, *R = *_R;
+	double *R_tmp = *_R;
 	double *E_tmp = *_E;
 	double *E_prev_tmp = *_E_prev;
 	double mx, sumSq;
@@ -209,24 +209,6 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		} 
 		//////////////////////////////////////////////////////////////////////////////
 
-		// #define FUSED 1
-
-	#ifdef FUSED
-		// Solve for the excitation, a PDE
-		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+= my_stride)
-		{
-			E_tmp = E + j;
-			E_prev_tmp = E_prev + j;
-			R_tmp = R + j;
-
-			for (int i = 0; i < my_n; i++)
-			{
-				E_tmp[i] = E_prev_tmp[i]+alpha*(E_prev_tmp[i+1]+E_prev_tmp[i-1]-4*E_prev_tmp[i]+E_prev_tmp[i+(my_n+2)]+E_prev_tmp[i-(my_n+2)]);
-				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
-				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
-			}
-		}
-	#else
 		// Solve for the excitation, a PDE
 		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_stride)
 		{
@@ -238,20 +220,15 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 			for (int i = 0; i < my_stride - 2; i += 2)
 			{
 				//ww = ee;
-				ww = _mm_load_pd(E_prev_tmp + i - 1);
-				cc = _mm_loadu_pd(E_prev_tmp + i + 0);
-				ee = _mm_load_pd(E_prev_tmp + i + 1);
-				nn = _mm_loadu_pd(E_prev_tmp + i - my_stride);
-				ss = _mm_loadu_pd(E_prev_tmp + i + my_stride);
+				ww = _mm_loadu_pd(E_prev_tmp + i - 1);
+				cc = _mm_load_pd(E_prev_tmp + i + 0);
+				ee = _mm_loadu_pd(E_prev_tmp + i + 1);
+				nn = _mm_load_pd(E_prev_tmp + i - my_stride);
+				ss = _mm_load_pd(E_prev_tmp + i + my_stride);
 
 				EE = _mm_add_pd(cc, _mm_mul_pd(alpha_alpha, _mm_sub_pd(_mm_add_pd(ww, _mm_add_pd(ee, _mm_add_pd(nn, ss))), _mm_mul_pd(four_four, cc))));
 				_mm_storeu_pd(E_tmp + i, EE);
 			}
-//			if (my_n % 2 == 1)
-//			{
-//				int i = my_n - 1;
-//				E_tmp[i] = E_prev_tmp[i]+alpha*(E_prev_tmp[i+1]+E_prev_tmp[i-1]-4*E_prev_tmp[i]+E_prev_tmp[i+(my_n+2)]+E_prev_tmp[i-(my_n+2)]);
-//			}
 		}
 
 		/* 
@@ -266,8 +243,8 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 
 			for (int i = 0; i < my_stride - 2; i += 2)
 			{
-				EE = _mm_loadu_pd(E_tmp + i);
-				RR = _mm_loadu_pd(R_tmp + i);
+				EE = _mm_load_pd(E_tmp + i);
+				RR = _mm_load_pd(R_tmp + i);
 
 				EE =	_mm_sub_pd
 						(
@@ -295,8 +272,6 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 							)
 						);
 
-				//__m128d tmp = _mm_sub_pd(_mm_mul_pd(kk_kk,_mm_mul_pd(EE, _mm_sub_pd(bp1_bp1, EE))), RR);
-				//__m128d tmp = _mm_sub_pd(_mm_xor_pd(RR,_mm_set1_pd(-0.0)),_mm_mul_pd(kk_kk,_mm_mul_pd(EE, _mm_sub_pd(EE, bp1_bp1))));
 				RR =	_mm_add_pd
 						(
 							RR,
@@ -338,19 +313,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 				_mm_storeu_pd(E_tmp + i, EE);
 				_mm_storeu_pd(R_tmp + i, RR);
 			}
-//			if (my_n % 2 == 1)
-//			{
-//				int i = my_n - 1;
-//				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
-//				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
-//			}
-//			for (int i = 0; i < my_n; ++i)
-//			{
-//				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
-//				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
-//			}
 		}
-	#endif
 		/////////////////////////////////////////////////////////////////////////////////
 
 		if (cb.plot_freq)
@@ -379,5 +342,10 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 	// Swap pointers so we can re-use the arrays
 	*_E = E;
 	*_E_prev = E_prev;
+	*_R = R;
 	
+	// Shift back so that free(E) doesn't segFault
+	(*_E)--;
+	(*_E_prev)--;
+	(*_R)--;
 }
