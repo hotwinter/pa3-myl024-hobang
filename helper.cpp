@@ -64,8 +64,8 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 		int rowIndex = i / my_stride;
 		int colIndex = i % my_stride;
 
-		if (rowIndex == 0 || rowIndex >= my_m + 1 || rowIndex <= di ||
-			colIndex == 0 || colIndex >= my_n + 1)
+		if (rowIndex == 0 || rowIndex == my_m + 1 || rowIndex <= di ||
+			colIndex <= 1 || colIndex >= my_n + 2)
 		{
 			R[i] = 0.0;
 		}
@@ -88,8 +88,8 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 		int rowIndex = i / my_stride;
 		int colIndex = i % my_stride;
 
-		if (colIndex == 0 || colIndex >= my_n + 1 || colIndex <= dj ||
-			rowIndex == 0 || rowIndex >= my_m + 1)
+		if (colIndex <= 1 || colIndex >= my_n + 2 || colIndex <= dj + 1 ||
+			rowIndex == 0 || rowIndex == my_m + 1)
 		{
 			E_prev[i] = 0.0;
 		}
@@ -121,7 +121,7 @@ double *alloc1D(int mPlus2,int nPlus2)
 	my_m = m / cb.py + (my_pi < (m % cb.py));
 	my_n = n / cb.px + (my_pj < (n % cb.px));
 
-	my_stride = (my_n % 2 == 0) ? my_n + 2 : my_n + 3;
+	my_stride = (my_n % 2 == 0) ? my_n + 4 : my_n + 5;
 
 	// Allocate contiguous memory for the WESTward and EASTward messages
 	in_W  = new double[4*my_m];
@@ -151,7 +151,7 @@ void printMat(const char mesg[], double *E)
 		int rowIndex = i / my_stride;
 		int colIndex = i % my_stride;
 
-		if ((colIndex == 0 || colIndex >= my_n + 1) && (rowIndex == 0 || rowIndex == my_m + 1))
+		if ((colIndex <= 1 || colIndex >= my_n + 2) && (rowIndex == 0 || rowIndex == my_m + 1))
 		{
 			printf("      ");
 		}
@@ -180,12 +180,12 @@ void stats(double *E, double *_mx, double *sumSq)
 	double mx = -1;
 	double _sumSq = 0;
  
-	for (int i = 1 + my_stride; i < (my_m + 1)*my_stride; ++i)
+	for (int i = 2 + my_stride; i < (my_m + 1)*my_stride; ++i)
 	{
 		int rowIndex = i / my_stride;           // gives the current row number in 2D array representation
 		int colIndex = i % my_stride;       // gives the base index (first row's) of the current index      
  
-		if (colIndex == 0 || colIndex >= my_n +1)
+		if (colIndex <= 1 || colIndex >= my_n + 2)
 		{
 			continue;
 		}

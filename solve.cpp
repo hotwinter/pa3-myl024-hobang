@@ -72,44 +72,44 @@ void communicate(double *E_prev)
 
 	if (my_pi == FARTHEST_NORTH)
 	{
-		for (i = 1; i < my_n + 1; ++i)
+		for (i = 2; i < my_n + 2; ++i)
 		{
 			E_prev[i] = E_prev[i + 2*my_stride];
 		}
 	}
 	else 	//Send the NORTH boundary & fill the NORTH ghost cells
 	{
-		MPI_Irecv(&E_prev[1], my_n, MPI_DOUBLE, my_rank - cb.px, SOUTH, MPI_COMM_WORLD, recvReqs + msgCounter);
-		MPI_Isend(&E_prev[1 + my_stride], my_n, MPI_DOUBLE, my_rank - cb.px, NORTH, MPI_COMM_WORLD, sendReqs + 0);
+		MPI_Irecv(&E_prev[2], my_n, MPI_DOUBLE, my_rank - cb.px, SOUTH, MPI_COMM_WORLD, recvReqs + msgCounter);
+		MPI_Isend(&E_prev[2 + my_stride], my_n, MPI_DOUBLE, my_rank - cb.px, NORTH, MPI_COMM_WORLD, sendReqs + 0);
 
 		msgCounter++;
 	}
 
 	if (my_pi == FARTHEST_SOUTH)
 	{
-		for (i = 1 + (my_m + 1)*my_stride; i < (my_m + 2)*my_stride - 1; ++i)
+		for (i = 2 + (my_m + 1)*my_stride; i < 2 + (my_m + 1)*my_stride + my_n ; ++i)
 		{
 			E_prev[i] = E_prev[i - 2*my_stride];
 		}
 	}
 	else	// Send the SOUTH boundary & fill the SOUTH ghost cells
 	{
-		MPI_Irecv(&E_prev[1 + (my_m + 1)*my_stride], my_n, MPI_DOUBLE, my_rank + cb.px, NORTH, MPI_COMM_WORLD, recvReqs + msgCounter);
-		MPI_Isend(&E_prev[1 + my_m*my_stride], my_n, MPI_DOUBLE, my_rank + cb.px, SOUTH, MPI_COMM_WORLD, sendReqs + 1);
+		MPI_Irecv(&E_prev[2 + (my_m + 1)*my_stride], my_n, MPI_DOUBLE, my_rank + cb.px, NORTH, MPI_COMM_WORLD, recvReqs + msgCounter);
+		MPI_Isend(&E_prev[2 + my_m*my_stride], my_n, MPI_DOUBLE, my_rank + cb.px, SOUTH, MPI_COMM_WORLD, sendReqs + 1);
 
 		msgCounter++;
 	}
 
 	if (my_pj == FARTHEST_WEST) 
 	{
-		for (i = my_stride; i < (my_m + 1)*my_stride; i += my_stride)
+		for (i = 1 + my_stride; i < 1 + (my_m + 1)*my_stride; i += my_stride)
 		{
 			E_prev[i] = E_prev[i + 2];
 		}
 	}
 	else	// Send the WEST boundary & fill the WEST ghost cells
 	{
-		for (i = 1 + my_stride, j = 0; j < my_m; i += my_stride, ++j)
+		for (i = 2 + my_stride, j = 0; j < my_m; i += my_stride, ++j)
 		{
 			out_W[j] = E_prev[i];
 		}
@@ -122,14 +122,14 @@ void communicate(double *E_prev)
 
 	if (my_pj == FARTHEST_EAST)
 	{
-		for (i = (my_n + 1) + my_stride; i < (my_n + 1) + (my_m + 1)*my_stride; i += my_stride)
+		for (i = (my_n + 2) + my_stride; i < (my_n + 2) + (my_m + 1)*my_stride; i += my_stride)
 		{
 			E_prev[i] = E_prev[i - 2];
 		}
 	}
 	else	// Send the EAST boundary & fill the EAST ghost cells
 	{
-		for (i = my_n + my_stride, j = 0; j < my_m; i += my_stride, ++j)
+		for (i = 1 + my_n + my_stride, j = 0; j < my_m; i += my_stride, ++j)
 		{
 			out_E[j] = E_prev[i];
 		}
@@ -145,7 +145,7 @@ void communicate(double *E_prev)
 
 	if (my_pj != FARTHEST_WEST)
 	{
-		for (i = my_stride, j = 0; j < my_m; i += my_stride, ++j) 		
+		for (i = 1 + my_stride, j = 0; j < my_m; i += my_stride, ++j) 		
 		{
 			E_prev[i] = in_W[j];
 		}
@@ -153,7 +153,7 @@ void communicate(double *E_prev)
 
 	if (my_pj != FARTHEST_EAST)
 	{
-		for (i = (my_n + 1) + my_stride, j = 0; j < my_m; i += my_stride, ++j)
+		for (i = (my_n + 2) + my_stride, j = 0; j < my_m; i += my_stride, ++j)
 		{
 			E_prev[i] = in_E[j];
 		}
@@ -176,8 +176,8 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 	double mx, sumSq;
 	int niter;
 	//int m = cb.m, n=cb.n;
-	int innerBlockRowStartIndex = 1 + my_stride;
-	int innerBlockRowEndIndex = 1 + (my_m + 1)*my_stride;
+	int innerBlockRowStartIndex = 2 + my_stride;
+	int innerBlockRowEndIndex = 2 + (my_m + 1)*my_stride;
 
 	__m128d cc, nn, ee, ww, ss; // vectorized stencil
 	__m128d EE, RR;
@@ -238,11 +238,11 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 			for (int i = 0; i < my_stride - 2; i += 2)
 			{
 				//ww = ee;
-				ww = _mm_load_pd(E_prev_tmp + i - 1);
-				cc = _mm_loadu_pd(E_prev_tmp + i + 0);
-				ee = _mm_load_pd(E_prev_tmp + i + 1);
-				nn = _mm_loadu_pd(E_prev_tmp + i - my_stride);
-				ss = _mm_loadu_pd(E_prev_tmp + i + my_stride);
+				ww = _mm_loadu_pd(E_prev_tmp + i - 1);
+				cc = _mm_load_pd(E_prev_tmp + i + 0);
+				ee = _mm_loadu_pd(E_prev_tmp + i + 1);
+				nn = _mm_load_pd(E_prev_tmp + i - my_stride);
+				ss = _mm_load_pd(E_prev_tmp + i + my_stride);
 
 				EE = _mm_add_pd(cc, _mm_mul_pd(alpha_alpha, _mm_sub_pd(_mm_add_pd(ww, _mm_add_pd(ee, _mm_add_pd(nn, ss))), _mm_mul_pd(four_four, cc))));
 				_mm_storeu_pd(E_tmp + i, EE);
@@ -266,8 +266,8 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 
 			for (int i = 0; i < my_stride - 2; i += 2)
 			{
-				EE = _mm_loadu_pd(E_tmp + i);
-				RR = _mm_loadu_pd(R_tmp + i);
+				EE = _mm_load_pd(E_tmp + i);
+				RR = _mm_load_pd(R_tmp + i);
 
 				EE =	_mm_sub_pd
 						(
