@@ -7,6 +7,7 @@
 #include <iostream>
 #include <assert.h>
 #include <malloc.h>
+#include <math.h>
 #include "cblock.h"
 #include <mpi.h>
 #include <string.h>
@@ -17,6 +18,7 @@ extern control_block cb;
 int my_rank;
 int my_pi, my_pj; // position of the process in the x-by-y grid of processes (we distribute the processes in row major order)
 int my_m, my_n; // the number of rows,cols in the subproblem (respectively)
+int my_stride;
 
 // We allocate some space for WESTward and EASTward messages
 // Because the ghosts cells are noncontiguous, we need to pack
@@ -43,12 +45,12 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 {
 	// By now, global variables my_rank, my_m, my_n have already been set
 
-	int nMin = n / cb.px;
-	int mMin = m / cb.py;
+	int nMin = cb.n / cb.px;
+	int mMin = cb.m / cb.py;
 
 	// Number of block-rows/cols that are extended by one
-	int rx = n % cb.px;
-	int ry = m % cb.py;
+	int rx = cb.n % cb.px;
+	int ry = cb.m % cb.py;
 
 	///////////////////////////////////////////////////////////////////////////////////////
 	//// Initialize R (R's ghosts cells are arbitrary since we don't use them anyways) ////
@@ -57,13 +59,13 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 	int iMin = my_pi*mMin + min(my_pi, ry); // GLOBAL index of the first row of the "computational" block (ignoring ghost cells)
 	int di = min((cb.m + 1)/2 - iMin, my_m); // Distance from iMin to the first row of 1.0s
 
-	for (int i = 0; i < (my_m + 2)*(my_n + 2); ++i)
+	for (int i = 0; i < (my_m + 2)*my_stride; ++i)
 	{
-		int rowIndex = i / (my_n + 2);
-		int colIndex = i % (my_n + 2);
+		int rowIndex = i / my_stride;
+		int colIndex = i % my_stride;
 
-		if (rowIndex == 0 || rowIndex == my_m + 1 || rowIndex <= di ||
-			colIndex == 0 || colIndex == my_n + 1)
+		if (rowIndex == 0 || rowIndex >= my_m + 1 || rowIndex <= di ||
+			colIndex == 0 || colIndex >= my_n + 1)
 		{
 			R[i] = 0.0;
 		}
@@ -81,13 +83,13 @@ void init (double *E, double *E_prev, double *R, int m, int n)
 	int jMin = my_pj*nMin + min(my_pj, rx);
 	int dj = min((cb.n + 1)/2 - jMin, my_n);
 
-	for (int i = 0; i < (my_m + 2)*(my_n + 2); ++i)
+	for (int i = 0; i < (my_m + 2)*my_stride; ++i)
 	{
-		int rowIndex = i / (my_n + 2);
-		int colIndex = i % (my_n + 2);
+		int rowIndex = i / my_stride;
+		int colIndex = i % my_stride;
 
-		if (colIndex == 0 || colIndex == my_n + 1 || colIndex <= dj ||
-			rowIndex == 0 || rowIndex == my_m + 1)
+		if (colIndex == 0 || colIndex >= my_n + 1 || colIndex <= dj ||
+			rowIndex == 0 || rowIndex >= my_m + 1)
 		{
 			E_prev[i] = 0.0;
 		}
@@ -118,6 +120,8 @@ double *alloc1D(int mPlus2,int nPlus2)
 	my_m = m / cb.py + (my_pi < (m % cb.py));
 	my_n = n / cb.px + (my_pj < (n % cb.px));
 
+	my_stride = (my_n % 2 == 0) ? my_m + 2 : my_m + 3;
+
 	// Allocate contiguous memory for the WESTward and EASTward messages
 	in_W  = new double[4*my_m];
 	in_E  = in_W  + my_m;
@@ -128,7 +132,7 @@ double *alloc1D(int mPlus2,int nPlus2)
 	// Pad the subproblem to accomodate E_prev's ghost cells
 	// We also pad R, although this is redundant and just for consistency
 	double *E;
-	assert(E= (double*) memalign(16, sizeof(double)*(my_m + 2)*(my_n + 2)));
+	assert(E = (double*)memalign(16, sizeof(double)*(my_m + 2)*my_stride));
 
 	return(E);
 }
@@ -167,4 +171,32 @@ void printMat(const char mesg[], double *E, int m, int n)
 			printf("\n");
 		}
 	}
+}
+
+// We overload this to facillitate our padded vectorization
+void stats(double *E, double *_mx, double *sumSq)
+{
+	double mx = -1;
+	double _sumSq = 0;
+ 
+	for (int i = 0; i< (my_m + 2)*my_stride; ++i)
+	{
+		int rowIndex = i / (my_stride);           // gives the current row number in 2D array representation
+		int colIndex = i % (my_stride);       // gives the base index (first row's) of the current index      
+ 
+		if (colIndex == 0 || colIndex >= my_n +1 || rowIndex == 0 || rowIndex == my_m + 1)
+		{
+			continue;
+		}
+ 
+		_sumSq += E[i]*E[i];
+		double fe = fabs(E[i]);
+
+		if (fe > mx)
+		{
+			mx = fe;
+		}
+	}
+	*_mx = mx;
+	*sumSq = _sumSq;
 }

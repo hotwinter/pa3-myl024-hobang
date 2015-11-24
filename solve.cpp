@@ -23,17 +23,16 @@ using namespace std;
 extern int my_rank;
 extern int my_pi, my_pj;
 extern int my_m, my_n;
+extern int my_stride;
 
 extern double *in_W, *in_E, *out_W, *out_E;
 
 extern control_block cb;
 
 void repNorms(double l2norm, double mx, double dt, int m,int n, int niter, int stats_freq);
-void stats(double *E, int m, int n, double *_mx, double *sumSq);
+void stats(double *E, double *_mx, double *sumSq);
 void printMat(const char*, double*, int m, int n);
 
-#define CORNER_SIZE 1
-#define PAD_SIZE 2
 #define ROOT 0
 
 #define FARTHEST_NORTH 0
@@ -73,44 +72,44 @@ void communicate(double *E_prev)
 
 	if (my_pi == FARTHEST_NORTH)
 	{
-		for (i = (0 + CORNER_SIZE); i < my_n + CORNER_SIZE; ++i)
+		for (i = 1; i < my_n + 1; ++i)
 		{
-			E_prev[i] = E_prev[i + 2*(my_n + PAD_SIZE)];
+			E_prev[i] = E_prev[i + 2*my_stride];
 		}
 	}
 	else 	//Send the NORTH boundary & fill the NORTH ghost cells
 	{
-		MPI_Irecv(&E_prev[CORNER_SIZE], my_n, MPI_DOUBLE, my_rank - cb.px, SOUTH, MPI_COMM_WORLD, recvReqs + msgCounter);
-		MPI_Isend(&E_prev[my_n + PAD_SIZE+CORNER_SIZE], my_n, MPI_DOUBLE, my_rank - cb.px, NORTH, MPI_COMM_WORLD, sendReqs + 0);
+		MPI_Irecv(&E_prev[1], my_n, MPI_DOUBLE, my_rank - cb.px, SOUTH, MPI_COMM_WORLD, recvReqs + msgCounter);
+		MPI_Isend(&E_prev[1 + my_stride], my_n, MPI_DOUBLE, my_rank - cb.px, NORTH, MPI_COMM_WORLD, sendReqs + 0);
 
 		msgCounter++;
 	}
 
 	if (my_pi == FARTHEST_SOUTH)
 	{
-		for (i = (my_m + CORNER_SIZE)*(my_n + PAD_SIZE) + CORNER_SIZE; i < (my_m + PAD_SIZE)*(my_n + PAD_SIZE) - CORNER_SIZE; ++i)
+		for (i = 1 + (my_m + 1)*my_stride; i < (my_m + 2)*my_stride - 1; ++i)
 		{
-			E_prev[i] = E_prev[i - 2*(my_n + PAD_SIZE)];
+			E_prev[i] = E_prev[i - 2*my_stride];
 		}
 	}
 	else	// Send the SOUTH boundary & fill the SOUTH ghost cells
 	{
-		MPI_Irecv(&E_prev[(my_m + CORNER_SIZE)*(my_n + PAD_SIZE) + CORNER_SIZE], my_n, MPI_DOUBLE, my_rank + cb.px, NORTH, MPI_COMM_WORLD, recvReqs + msgCounter);
-		MPI_Isend(&E_prev[my_m*(my_n + PAD_SIZE) + CORNER_SIZE], my_n, MPI_DOUBLE, my_rank + cb.px, SOUTH, MPI_COMM_WORLD, sendReqs + 1);
+		MPI_Irecv(&E_prev[1 + (my_m + 1)*my_stride], my_n, MPI_DOUBLE, my_rank + cb.px, NORTH, MPI_COMM_WORLD, recvReqs + msgCounter);
+		MPI_Isend(&E_prev[1 + my_m*my_stride], my_n, MPI_DOUBLE, my_rank + cb.px, SOUTH, MPI_COMM_WORLD, sendReqs + 1);
 
 		msgCounter++;
 	}
 
 	if (my_pj == FARTHEST_WEST) 
 	{
-		for (i = my_n + PAD_SIZE; i < (my_m + CORNER_SIZE)*(my_n + PAD_SIZE); i += (my_n + PAD_SIZE))
+		for (i = my_stride; i < (my_m + 1)*my_stride; i += my_stride)
 		{
 			E_prev[i] = E_prev[i + 2];
 		}
 	}
 	else	// Send the WEST boundary & fill the WEST ghost cells
 	{
-		for (i = my_n + PAD_SIZE + 1, j = 0; j < my_m; i += my_n + PAD_SIZE, ++j)
+		for (i = 1 + my_stride, j = 0; j < my_m; i += my_stride, ++j)
 		{
 			out_W[j] = E_prev[i];
 		}
@@ -123,14 +122,14 @@ void communicate(double *E_prev)
 
 	if (my_pj == FARTHEST_EAST)
 	{
-		for (i = (my_n + CORNER_SIZE) + 1*(my_n + PAD_SIZE); i < (my_n + CORNER_SIZE) + (my_m + CORNER_SIZE)*(my_n + PAD_SIZE); i += (my_n + PAD_SIZE))
+		for (i = (my_n + 1) + my_stride; i < (my_n + 1) + (my_m + 1)*my_stride; i += my_stride)
 		{
 			E_prev[i] = E_prev[i - 2];
 		}
 	}
 	else	// Send the EAST boundary & fill the EAST ghost cells
 	{
-		for (i = my_n + (my_n + PAD_SIZE), j = 0; j < my_m; i += (my_n + PAD_SIZE), ++j)
+		for (i = my_n + my_stride, j = 0; j < my_m; i += my_stride, ++j)
 		{
 			out_E[j] = E_prev[i];
 		}
@@ -146,7 +145,7 @@ void communicate(double *E_prev)
 
 	if (my_pj != FARTHEST_WEST)
 	{
-		for (i = my_n + PAD_SIZE, j = 0; j < my_m; i += my_n + PAD_SIZE, ++j) 		
+		for (i = my_stride, j = 0; j < my_m; i += my_stride, ++j) 		
 		{
 			E_prev[i] = in_W[j];
 		}
@@ -154,7 +153,7 @@ void communicate(double *E_prev)
 
 	if (my_pj != FARTHEST_EAST)
 	{
-		for (i = (my_n + CORNER_SIZE) + (my_n + PAD_SIZE), j = 0; j < my_m; i += my_n + PAD_SIZE, ++j)
+		for (i = (my_n + 1) + my_stride, j = 0; j < my_m; i += my_stride, ++j)
 		{
 			E_prev[i] = in_E[j];
 		}
@@ -177,8 +176,8 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 	double mx, sumSq;
 	int niter;
 	//int m = cb.m, n=cb.n;
-	int innerBlockRowStartIndex = (my_n+PAD_SIZE)+CORNER_SIZE;
-	int innerBlockRowEndIndex = (((my_m+PAD_SIZE)*(my_n+PAD_SIZE) - CORNER_SIZE) - (my_n)) - (my_n+PAD_SIZE);
+	int innerBlockRowStartIndex = 1 + my_stride;
+	int innerBlockRowEndIndex = 1 + (my_m + 1)*my_stride;
 
 	__m128d cc, nn, ee, ww, ss; // vectorized stencil
 	__m128d EE, RR;
@@ -214,7 +213,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 
 	#ifdef FUSED
 		// Solve for the excitation, a PDE
-		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+= my_n + PAD_SIZE)
+		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+= my_stride)
 		{
 			E_tmp = E + j;
 			E_prev_tmp = E_prev + j;
@@ -229,7 +228,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		}
 	#else
 		// Solve for the excitation, a PDE
-		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_n + PAD_SIZE)
+		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_stride)
 		{
 			E_tmp = E + j;
 			E_prev_tmp = E_prev + j;
@@ -248,11 +247,11 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 				EE = _mm_add_pd(cc, _mm_mul_pd(alpha_alpha, _mm_sub_pd(_mm_add_pd(ww, _mm_add_pd(ee, _mm_add_pd(nn, ss))), _mm_mul_pd(four_four, cc))));
 				_mm_storeu_pd(E_tmp + i, EE);
 			}
-			if (my_n % 2 == 1)
-			{
-				int i = my_n - 1;
-				E_tmp[i] = E_prev_tmp[i]+alpha*(E_prev_tmp[i+1]+E_prev_tmp[i-1]-4*E_prev_tmp[i]+E_prev_tmp[i+(my_n+2)]+E_prev_tmp[i-(my_n+2)]);
-			}
+//			if (my_n % 2 == 1)
+//			{
+//				int i = my_n - 1;
+//				E_tmp[i] = E_prev_tmp[i]+alpha*(E_prev_tmp[i+1]+E_prev_tmp[i-1]-4*E_prev_tmp[i]+E_prev_tmp[i+(my_n+2)]+E_prev_tmp[i-(my_n+2)]);
+//			}
 		}
 
 		/* 
@@ -260,7 +259,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		 *     to the next timtestep
 		 */
 
-		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_n + PAD_SIZE)
+		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_stride)
 		{
 			E_tmp = E + j;
 			R_tmp = R + j;
@@ -339,12 +338,12 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 				_mm_storeu_pd(E_tmp + i, EE);
 				_mm_storeu_pd(R_tmp + i, RR);
 			}
-			if (my_n % 2 == 1)
-			{
-				int i = my_n - 1;
-				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
-				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
-			}
+//			if (my_n % 2 == 1)
+//			{
+//				int i = my_n - 1;
+//				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
+//				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
+//			}
 //			for (int i = 0; i < my_n; ++i)
 //			{
 //				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
@@ -370,7 +369,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 	
 	double reducedSq = 0.0;	
 
-	stats(E_prev, my_m, my_n, &mx, &sumSq);	
+	stats(E_prev, &mx, &sumSq);	
 
 	MPI_Reduce(&sumSq, &reducedSq, 1, MPI_DOUBLE, MPI_SUM, ROOT, MPI_COMM_WORLD);
 	MPI_Reduce(&mx, &Linf, 1, MPI_DOUBLE, MPI_MAX, ROOT, MPI_COMM_WORLD);
