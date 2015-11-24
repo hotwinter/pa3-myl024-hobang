@@ -270,24 +270,46 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 				EE = _mm_loadu_pd(E_tmp + i);
 				RR = _mm_loadu_pd(R_tmp + i);
 
-				EE = _mm_sub_pd(EE,
-                                   _mm_mul_pd(dt_dt,
-                                                    _mm_add_pd(_mm_mul_pd(kk_kk,
-                                                                                _mm_mul_pd(EE,
-                                                                                              _mm_mul_pd(_mm_sub_pd(EE, a_a),
-                                                                                                                             _mm_sub_pd(EE, one_one)))),
-																																						_mm_mul_pd(EE, RR))));
+				EE =	_mm_sub_pd
+						(
+							EE,
+							_mm_mul_pd
+							(
+								dt_dt,
+								_mm_add_pd
+								(
+									_mm_mul_pd
+									(
+										kk_kk,
+										_mm_mul_pd
+										(
+											EE,
+											_mm_mul_pd
+											(
+												_mm_sub_pd(EE, a_a),
+												_mm_sub_pd(EE, one_one)
+											)
+										)
+									),
+									_mm_mul_pd(EE, RR)
+								)
+							)
+						);
 
 				__m128d tmp = _mm_sub_pd(_mm_mul_pd(kk_kk,_mm_mul_pd(EE, _mm_sub_pd(bp1_bp1, EE))), RR);
-				RR = _mm_add_pd(RR, _mm_mul_pd(dt_dt, _mm_add_pd(epsilon_epsilon, _mm_mul_pd(M1_M1, _mm_mul_pd(_mm_div_pd(RR, _mm_add_pd(EE, M2_M2)), tmp)))));
+				//__m128d tmp = _mm_sub_pd(_mm_xor_pd(RR,_mm_set1_pd(-0.0)),_mm_mul_pd(kk_kk,_mm_mul_pd(EE, _mm_sub_pd(EE, bp1_bp1))));
+				RR = _mm_add_pd(RR,
+                                   _mm_mul_pd(dt_dt,
+                                                    _mm_mul_pd(_mm_add_pd(epsilon_epsilon,
+								                       	                                  _mm_mul_pd(M1_M1, _mm_div_pd(RR, _mm_add_pd(EE, M2_M2)))), tmp)));
 
 				_mm_storeu_pd(E_tmp + i, EE);
-				//_mm_storeu_pd(R_tmp + i, RR);
+				_mm_storeu_pd(R_tmp + i, RR);
 
 				//E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
 				//E_tmp[i+1] += -dt*(kk*E_tmp[i+1]*(E_tmp[i+1]-a)*(E_tmp[i+1]-1)+E_tmp[i+1]*R_tmp[i+1]);
-				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
-				R_tmp[i+1] += dt*(epsilon+M1* R_tmp[i+1]/( E_tmp[i+1]+M2))*(-R_tmp[i+1]-kk*E_tmp[i+1]*(E_tmp[i+1]-b-1));
+				//R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
+				//R_tmp[i+1] += dt*(epsilon+M1* R_tmp[i+1]/( E_tmp[i+1]+M2))*(-R_tmp[i+1]-kk*E_tmp[i+1]*(E_tmp[i+1]-b-1));
 			}
 			if (my_n % 2 == 1)
 			{
