@@ -238,9 +238,9 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 			for (int i = 0; i < my_stride - 2; i += 2)
 			{
 				//ww = ee;
-				ww = _mm_loadu_pd(E_prev_tmp + i - 1);
+				ww = _mm_load_pd(E_prev_tmp + i - 1);
 				cc = _mm_loadu_pd(E_prev_tmp + i + 0);
-				ee = _mm_loadu_pd(E_prev_tmp + i + 1);
+				ee = _mm_load_pd(E_prev_tmp + i + 1);
 				nn = _mm_loadu_pd(E_prev_tmp + i - my_stride);
 				ss = _mm_loadu_pd(E_prev_tmp + i + my_stride);
 
