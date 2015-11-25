@@ -208,26 +208,9 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		{
 			communicate(E_prev);
 		} 
+
 		//////////////////////////////////////////////////////////////////////////////
 
-		// #define FUSED 1
-
-	#ifdef FUSED
-		// Solve for the excitation, a PDE
-		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j+= my_n + PAD_SIZE)
-		{
-			E_tmp = E + j;
-			E_prev_tmp = E_prev + j;
-			R_tmp = R + j;
-
-			for (int i = 0; i < my_n; i++)
-			{
-				E_tmp[i] = E_prev_tmp[i]+alpha*(E_prev_tmp[i+1]+E_prev_tmp[i-1]-4*E_prev_tmp[i]+E_prev_tmp[i+(my_n+2)]+E_prev_tmp[i-(my_n+2)]);
-				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
-				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
-			}
-		}
-	#else
 		// Solve for the excitation, a PDE
 		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_n + PAD_SIZE)
 		{
@@ -260,84 +243,22 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 		 *     to the next timtestep
 		 */
 
+		#define UNROLL 1
+
 		for (int j = innerBlockRowStartIndex; j <= innerBlockRowEndIndex; j += my_n + PAD_SIZE)
 		{
 			E_tmp = E + j;
 			R_tmp = R + j;
 
+		#ifdef UNROLL
+
 			for (int i = 0; i < my_n; i += 2)
 			{
-				EE = _mm_loadu_pd(E_tmp + i);
-				RR = _mm_loadu_pd(R_tmp + i);
+				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
+				E_tmp[i+1] += -dt*(kk*E_tmp[i+1]*(E_tmp[i+1]-a)*(E_tmp[i+1]-1)+E_tmp[i+1]*R_tmp[i+1]);
 
-				EE =	_mm_sub_pd
-						(
-							EE,
-							_mm_mul_pd
-							(
-								dt_dt,
-								_mm_add_pd
-								(
-									_mm_mul_pd
-									(
-										kk_kk,
-										_mm_mul_pd
-										(
-											EE,
-											_mm_mul_pd
-											(
-												_mm_sub_pd(EE, a_a),
-												_mm_sub_pd(EE, one_one)
-											)
-										)
-									),
-									_mm_mul_pd(EE, RR)
-								)
-							)
-						);
-
-				//__m128d tmp = _mm_sub_pd(_mm_mul_pd(kk_kk,_mm_mul_pd(EE, _mm_sub_pd(bp1_bp1, EE))), RR);
-				//__m128d tmp = _mm_sub_pd(_mm_xor_pd(RR,_mm_set1_pd(-0.0)),_mm_mul_pd(kk_kk,_mm_mul_pd(EE, _mm_sub_pd(EE, bp1_bp1))));
-				RR =	_mm_add_pd
-						(
-							RR,
-							_mm_mul_pd
-							(
-								dt_dt,
-								_mm_mul_pd
-								(
-									_mm_add_pd
-									(
-										epsilon_epsilon,
-										_mm_mul_pd
-										(
-											M1_M1,
-											_mm_div_pd
-											(
-												RR,
-												_mm_add_pd(EE, M2_M2)
-											)
-										)
-									),
-									_mm_sub_pd
-									(
-										_mm_xor_pd(RR,_mm_set1_pd(-0.0)), // { -R_tmp[i] , -R_tmp[i+1] }
-										_mm_mul_pd
-										(
-											kk_kk,
-											_mm_mul_pd
-											(
-												EE,
-												_mm_sub_pd(EE, bp1_bp1)
-											)
-										)
-									)
-								)
-							)
-						);
-
-				_mm_storeu_pd(E_tmp + i, EE);
-				_mm_storeu_pd(R_tmp + i, RR);
+				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
+				R_tmp[i+1] += dt*(epsilon+M1* R_tmp[i+1]/( E_tmp[i+1]+M2))*(-R_tmp[i+1]-kk*E_tmp[i+1]*(E_tmp[i+1]-b-1));
 			}
 			if (my_n % 2 == 1)
 			{
@@ -345,13 +266,18 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
 				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
 			}
-//			for (int i = 0; i < my_n; ++i)
-//			{
-//				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
-//				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
-//			}
+
+		#else
+
+			for (int i = 0; i < my_n; ++i)
+			{
+				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
+				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
+			}
+
+		#endif
 		}
-	#endif
+
 		/////////////////////////////////////////////////////////////////////////////////
 
 		if (cb.plot_freq)
