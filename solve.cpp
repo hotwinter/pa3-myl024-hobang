@@ -236,7 +236,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 
 			//ww = _mm_loadu_pd(E_prev_tmp - 1);
 
-			for (int i = 0; i < my_n; i += 2)
+			for (int i = 0; i < my_n; i += 2) // We sometimes blow through the ghost cells, which is fine
 			{
 				//ww = ee;
 				ww = _mm_loadu_pd(E_prev_tmp + i - 1);
@@ -247,11 +247,6 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 
 				EE = _mm_add_pd(cc, _mm_mul_pd(alpha_alpha, _mm_sub_pd(_mm_add_pd(ww, _mm_add_pd(ee, _mm_add_pd(nn, ss))), _mm_mul_pd(four_four, cc))));
 				_mm_storeu_pd(E_tmp + i, EE);
-			}
-			if (my_n % 2 == 1)
-			{
-				int i = my_n - 1;
-				E_tmp[i] = E_prev_tmp[i]+alpha*(E_prev_tmp[i+1]+E_prev_tmp[i-1]-4*E_prev_tmp[i]+E_prev_tmp[i+(my_n+2)]+E_prev_tmp[i-(my_n+2)]);
 			}
 		}
 
@@ -265,7 +260,7 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 			E_tmp = E + j;
 			R_tmp = R + j;
 
-			for (int i = 0; i < my_n; i += 2)
+			for (int i = 0; i < my_n; i += 2) // we sometimes blow through the ghost cells, which is fine
 			{
 				EE = _mm_loadu_pd(E_tmp + i);
 				RR = _mm_loadu_pd(R_tmp + i);
@@ -296,8 +291,6 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 							)
 						);
 
-				//__m128d tmp = _mm_sub_pd(_mm_mul_pd(kk_kk,_mm_mul_pd(EE, _mm_sub_pd(bp1_bp1, EE))), RR);
-				//__m128d tmp = _mm_sub_pd(_mm_xor_pd(RR,_mm_set1_pd(-0.0)),_mm_mul_pd(kk_kk,_mm_mul_pd(EE, _mm_sub_pd(EE, bp1_bp1))));
 				RR =	_mm_add_pd
 						(
 							RR,
@@ -339,17 +332,6 @@ void solve(double **_E, double **_E_prev, double *R, double alpha, double dt, Pl
 				_mm_storeu_pd(E_tmp + i, EE);
 				_mm_storeu_pd(R_tmp + i, RR);
 			}
-			if (my_n % 2 == 1)
-			{
-				int i = my_n - 1;
-				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
-				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
-			}
-//			for (int i = 0; i < my_n; ++i)
-//			{
-//				E_tmp[i] += -dt*(kk*E_tmp[i]*(E_tmp[i]-a)*(E_tmp[i]-1)+E_tmp[i]*R_tmp[i]);
-//				R_tmp[i] += dt*(epsilon+M1* R_tmp[i]/( E_tmp[i]+M2))*(-R_tmp[i]-kk*E_tmp[i]*(E_tmp[i]-b-1));
-//			}
 		}
 	#endif
 		/////////////////////////////////////////////////////////////////////////////////
